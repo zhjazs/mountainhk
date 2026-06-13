@@ -198,10 +198,14 @@ h2 { font-size: 1.25rem; font-weight: 600; }
    ============================================ */
 .map-section {
   position: relative;
-  width: 100%; height: var(--map-height);
+  width: 100%;
+  height: calc(100dvh - 56px);
   z-index: 1;
 }
-.map-section > div { width: 100%; height: 100%; }
+.map-section > div {
+  width: 100% !important;
+  height: 100% !important;
+}
 
 /* Leaflet overrides to match dark theme */
 .leaflet-container {
@@ -1026,8 +1030,23 @@ const appMain = $('#app-main');
 const topNav = $('#top-nav');
 
 function showView(view) {
-  authLogin.classList.toggle('active', view === 'login');
-  authRegister.classList.toggle('active', view === 'register');
+  // Force hide all auth containers when showing app
+  if (view === 'app') {
+    authLogin.classList.remove('active');
+    authRegister.classList.remove('active');
+    authLogin.style.display = 'none';
+    authRegister.style.display = 'none';
+  } else if (view === 'login') {
+    authLogin.classList.add('active');
+    authLogin.style.display = 'flex';
+    authRegister.classList.remove('active');
+    authRegister.style.display = 'none';
+  } else if (view === 'register') {
+    authRegister.classList.add('active');
+    authRegister.style.display = 'flex';
+    authLogin.classList.remove('active');
+    authLogin.style.display = 'none';
+  }
   appMain.classList.toggle('active', view === 'app');
   topNav.classList.toggle('active', view === 'app');
 }
@@ -1117,11 +1136,9 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     await loadCheckins();
     showView('app');
     updateNav();
-    setTimeout(() => {
-      renderMap();
-      updateStats();
-      renderBadges();
-    }, 100);
+    renderMap();
+    updateStats();
+    renderBadges();
     fetchWeather();
   } else {
     console.log('[hkmountain] 用戶已登出');
