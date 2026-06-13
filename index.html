@@ -744,9 +744,26 @@ const SUPABASE_URL = 'https://rqtudoxxkwqsfihsylbw.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxdHVkb3h4a3dxc2ZpaHN5bGJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNTI2NjQsImV4cCI6MjA5NjkyODY2NH0.szAdVQwGK6d9FPPwUqA-LU5Kck5xMs15B7_Mre8jzFY';
 
 // ============================================
+// DEBUG & ERROR HANDLING
+// ============================================
+console.log('[hkmountain] 初始化開始...');
+console.log('[hkmountain] window.supabase:', typeof window.supabase);
+
+// ============================================
 // SUPABASE CLIENT
 // ============================================
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let supabase;
+try {
+  if (typeof window.supabase === 'undefined') {
+    throw new Error('Supabase CDN 未載入，請檢查網絡連接');
+  }
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log('[hkmountain] Supabase client 創建成功');
+} catch (e) {
+  console.error('[hkmountain] Supabase 初始化失敗:', e.message);
+  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0d1f17;color:#e8ece9;font-family:sans-serif;text-align:center;padding:2rem;"><div><h1>😵 載入失敗</h1><p style="color:#9ab5a4;margin-top:0.5rem;">${e.message}</p><p style="color:#5c7a66;font-size:0.875rem;margin-top:1rem;">請檢查網絡連接後刷新頁面</p></div></div>`;
+  throw e; // Stop execution
+}
 
 // ============================================
 // MOUNTAIN DATA
@@ -838,9 +855,11 @@ $('#btn-login').addEventListener('click', async () => {
 
 // Register
 $('#btn-register').addEventListener('click', async () => {
+  console.log('[hkmountain] 註冊按鈕被點擊');
   const username = $('#reg-username').value.trim();
   const email = $('#reg-email').value.trim();
   const password = $('#reg-password').value;
+  console.log('[hkmountain] 註冊資料:', { username, email, passwordLength: password.length, avatarGender });
   if (!username || !email || !password) {
     $('#register-error').textContent = '請填寫所有欄位';
     return;
@@ -849,19 +868,30 @@ $('#btn-register').addEventListener('click', async () => {
     $('#register-error').textContent = '密碼至少需要 6 位';
     return;
   }
+  $('#register-error').textContent = '';
+  $('#btn-register').textContent = '註冊中...';
+  $('#btn-register').disabled = true;
+  console.log('[hkmountain] 調用 supabase.auth.signUp...');
   const { data, error } = await supabase.auth.signUp({ email, password });
+  console.log('[hkmountain] signUp 結果:', { data: !!data, error: error?.message });
   if (error) {
     $('#register-error').textContent = error.message.includes('already registered')
       ? '此郵箱已被註冊' : error.message;
+    $('#btn-register').textContent = '註 冊';
+    $('#btn-register').disabled = false;
     return;
   }
   if (data.user) {
-    await supabase.from('profiles').insert({
+    console.log('[hkmountain] 用戶創建成功，寫入 profiles...');
+    const { error: profileError } = await supabase.from('profiles').insert({
       id: data.user.id,
       username,
       avatar_gender: avatarGender
     });
+    console.log('[hkmountain] profiles 寫入:', { error: profileError?.message });
   }
+  $('#btn-register').textContent = '註 冊';
+  $('#btn-register').disabled = false;
 });
 
 // Avatar picker
