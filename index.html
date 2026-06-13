@@ -11,6 +11,7 @@
 <meta name="theme-color" content="#0d1f17">
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="preconnect" href="https://unpkg.com">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <!-- Scripts loaded dynamically at bottom of body -->
 
 <style>
@@ -193,191 +194,77 @@ h2 { font-size: 1.25rem; font-weight: 600; }
 .app-main.active { display: flex; }
 
 /* ============================================
-   MAP SECTION
+   MAP SECTION (Leaflet)
    ============================================ */
 .map-section {
   position: relative;
   width: 100%; height: var(--map-height);
-  overflow: hidden;
-  background: linear-gradient(180deg, #87CEEB 0%, #a8d8ea 40%, #b8d4e0 70%, var(--ocean) 100%);
+  z-index: 1;
 }
+.map-section > div { width: 100%; height: 100%; }
 
-.map-section svg { width: 100%; height: 100%; display: block; }
-
-/* Weather overlay */
-.weather-layer {
-  position: absolute; inset: 0; pointer-events: none; z-index: 2; overflow: hidden;
+/* Leaflet overrides to match dark theme */
+.leaflet-container {
+  background: #1a2a1f;
+  font-family: var(--font-sans);
 }
+.leaflet-control-zoom a {
+  background: var(--bg-surface) !important;
+  color: var(--ink-primary) !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+.leaflet-control-attribution {
+  background: rgba(0,0,0,0.5) !important;
+  color: var(--ink-muted) !important;
+  font-size: 0.625rem !important;
+}
+.leaflet-control-attribution a { color: var(--ink-secondary) !important; }
 
-/* Sun */
-.weather-sun {
-  position: absolute; top: 10%; right: 15%;
-  width: 60px; height: 60px;
-  background: radial-gradient(circle, #ffe082 30%, #ffcc02 60%, transparent 70%);
+/* Custom mountain marker */
+.mountain-marker {
+  width: 24px; height: 24px;
   border-radius: 50%;
-  box-shadow: 0 0 40px rgba(255,204,2,0.5), 0 0 80px rgba(255,204,2,0.2);
-  animation: sunPulse 3s ease-in-out infinite;
+  background: var(--bg-surface);
+  border: 2px solid var(--ink-muted);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
-@keyframes sunPulse {
-  0%, 100% { box-shadow: 0 0 40px rgba(255,204,2,0.5), 0 0 80px rgba(255,204,2,0.2); }
-  50% { box-shadow: 0 0 60px rgba(255,204,2,0.7), 0 0 100px rgba(255,204,2,0.3); }
-}
-
-/* Clouds */
-.weather-cloud {
-  position: absolute;
-  background: rgba(255,255,255,0.85);
-  border-radius: 50%;
-  animation: cloudDrift linear infinite;
-}
-.weather-cloud::before,
-.weather-cloud::after {
-  content: ''; position: absolute;
-  background: inherit; border-radius: 50%;
-}
-@keyframes cloudDrift {
-  0% { transform: translateX(120vw); }
-  100% { transform: translateX(-150%); }
+.mountain-marker:hover { transform: scale(1.2); }
+.mountain-marker.checked {
+  background: var(--accent-jade);
+  border-color: var(--accent-jade);
+  box-shadow: 0 0 12px rgba(45,138,86,0.4);
 }
 
-/* Rain */
-.weather-rain {
-  position: absolute; inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent, transparent 2px,
-    rgba(100,160,210,0.3) 3px, transparent 4px
-  );
-  animation: rainFall 0.5s linear infinite;
-  opacity: 0;
-  transition: opacity 2s;
+/* Mountain tooltip */
+.leaflet-tooltip.mountain-tooltip {
+  background: var(--bg-surface);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  color: var(--ink-primary);
+  font-family: var(--font-cn);
+  font-size: 0.75rem;
+  padding: 0.375rem 0.625rem;
+  box-shadow: var(--shadow-card);
+  white-space: nowrap;
 }
-.weather-rain.active { opacity: 1; }
-@keyframes rainFall {
-  0% { transform: translateY(-10px); }
-  100% { transform: translateY(10px); }
+.leaflet-tooltip.mountain-tooltip::before {
+  border-top-color: var(--bg-surface);
 }
-
-/* Heavy rain */
-.weather-heavy-rain {
-  position: absolute; inset: 0;
-  background: repeating-linear-gradient(
-    15deg,
-    transparent, transparent 1px,
-    rgba(80,130,180,0.5) 2px, transparent 2px
-  );
-  animation: heavyRainFall 0.35s linear infinite;
-  opacity: 0;
-  transition: opacity 2s;
-}
-.weather-heavy-rain.active { opacity: 1; }
-@keyframes heavyRainFall {
-  0% { transform: translateY(-15px) translateX(-5px); }
-  100% { transform: translateY(15px) translateX(5px); }
-}
-
-/* Fog */
-.weather-fog {
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 30% 50%, rgba(255,255,255,0.25) 0%, transparent 60%),
-              radial-gradient(ellipse at 70% 50%, rgba(255,255,255,0.2) 0%, transparent 60%);
-  animation: fogDrift 8s ease-in-out infinite;
-  opacity: 0;
-  transition: opacity 2s;
-}
-.weather-fog.active { opacity: 1; }
-@keyframes fogDrift {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(20px); }
-}
-
-/* Lightning */
-.weather-lightning {
-  position: absolute; inset: 0; background: rgba(255,255,255,0);
-  opacity: 0; transition: opacity 0.05s; pointer-events: none;
-}
-.weather-lightning.flash { opacity: 0.6; background: rgba(255,255,255,1); }
-
-/* Dark cloud overlay for rain/thunderstorm */
-.weather-dark-clouds {
-  position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(60,70,80,0.5) 0%, rgba(80,90,100,0.4) 50%, transparent 100%);
-  opacity: 0; transition: opacity 2s;
-}
-.weather-dark-clouds.active { opacity: 1; }
 
 /* Temperature badge */
 .weather-temp {
-  position: absolute; top: 12px; right: 12px; z-index: 5;
-  background: rgba(0,0,0,0.5); backdrop-filter: blur(10px);
+  position: absolute; top: 12px; right: 12px; z-index: 1000;
+  background: rgba(11,26,20,0.8); backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   color: var(--ink-primary); font-size: 0.8125rem; font-weight: 600;
   padding: 0.375rem 0.75rem; border-radius: var(--radius-btn);
+  border: 1px solid rgba(255,255,255,0.08);
   pointer-events: none;
 }
-
-/* ============================================
-   MAP SVG ELEMENTS
-   ============================================ */
-.mountain-group { cursor: pointer; transition: transform 0.2s var(--ease-out-quint); }
-.mountain-group:hover { transform: scale(1.08); }
-.mountain-group.checked .mountain-peak { fill: var(--accent-jade); }
-.mountain-group.checked .mountain-body { fill: #4caf50; }
-.mountain-group .flag { opacity: 0; transition: opacity 0.3s; }
-.mountain-group.checked .flag { opacity: 1; }
-
-.mountain-label {
-  font-family: var(--font-cn); font-size: 11px; fill: var(--ink-primary);
-  text-anchor: middle; pointer-events: none;
-}
-.mountain-label-en {
-  font-family: var(--font-sans); font-size: 9px; fill: var(--ink-secondary);
-  text-anchor: middle; pointer-events: none;
-}
-
-/* Hiker */
-.hiker-group { transition: transform 0.6s var(--ease-out-quint); }
-.hiker-body { animation: hikerBob 0.6s ease-in-out infinite; }
-.hiker-left-leg { animation: hikerLeftLeg 0.6s ease-in-out infinite; transform-origin: 50% 75%; }
-.hiker-right-leg { animation: hikerRightLeg 0.6s ease-in-out infinite; transform-origin: 50% 75%; }
-.hiker-pole { animation: hikerPole 0.6s ease-in-out infinite; transform-origin: 80% 50%; }
-.hiker-backpack { animation: hikerBackpack 0.6s ease-in-out infinite 0.1s; }
-
-@keyframes hikerBob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-@keyframes hikerLeftLeg {
-  0%, 100% { transform: rotate(-6deg); }
-  50% { transform: rotate(6deg); }
-}
-@keyframes hikerRightLeg {
-  0%, 100% { transform: rotate(6deg); }
-  50% { transform: rotate(-6deg); }
-}
-@keyframes hikerPole {
-  0%, 100% { transform: rotate(-4deg); }
-  50% { transform: rotate(4deg); }
-}
-@keyframes hikerBackpack {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-1.5px); }
-}
-
-/* Fast walk in thunderstorm */
-.hiker-group.fast .hiker-body { animation-duration: 0.3s; }
-.hiker-group.fast .hiker-left-leg { animation-duration: 0.3s; }
-.hiker-group.fast .hiker-right-leg { animation-duration: 0.3s; }
-.hiker-group.fast .hiker-pole { animation-duration: 0.3s; }
-.hiker-group.fast .hiker-backpack { animation-duration: 0.3s; }
-
-/* Hiker umbrella */
-.hiker-umbrella { opacity: 0; transition: opacity 0.3s; }
-.hiker-group.raining .hiker-umbrella { opacity: 1; }
-
-/* Hiker flashlight for fog */
-.hiker-flashlight { opacity: 0; transition: opacity 0.3s; }
-.hiker-group.foggy .hiker-flashlight { opacity: 0.6; }
 
 /* ============================================
    STATS PANEL
@@ -673,10 +560,7 @@ h2 { font-size: 1.25rem; font-weight: 600; }
 
   <!-- MAP -->
   <section class="map-section" id="map-section">
-    <svg id="map-svg" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
-      <!-- Generated by JS -->
-    </svg>
-    <div class="weather-layer" id="weather-layer"></div>
+    <div id="map"></div>
     <div class="weather-temp" id="weather-temp"></div>
   </section>
 
@@ -772,9 +656,9 @@ h2 { font-size: 1.25rem; font-weight: 600; }
 // DYNAMIC SCRIPT LOADER (China-friendly CDN strategy)
 // ============================================
 const CDN_SCRIPTS = [
-  { name: 'anime', urls: [
-    'https://unpkg.com/animejs@3.2.2/lib/anime.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js',
+  { name: 'leaflet', urls: [
+    'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+    'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
   ]},
   { name: 'confetti', urls: [
     'https://unpkg.com/canvas-confetti@1/dist/confetti.browser.min.js',
@@ -1253,149 +1137,44 @@ function updateNav() {
 
 // ============================================
 // ============================================
-// SVG MAP RENDERING
+// LEAFLET MAP
 // ============================================
-function geoToSvg(lat, lng) {
-  const x = (lng - 113.82) / 0.60 * 800;
-  const y = (22.55 - lat) / 0.40 * 600;
-  return { x, y };
-}
+let map = null;
+let mountainMarkers = {};
 
 function renderMap() {
-  const svg = $('#map-svg');
+  if (map) { map.remove(); }
+  map = L.map('map', {
+    center: [22.35, 114.15],
+    zoom: 11,
+    zoomControl: true,
+    attributionControl: false,
+  });
+
+  // OpenStreetMap tiles (free, no API key)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+  }).addTo(map);
+
   const checkedIds = checkins.map(c => c.mountain_id);
 
-  let html = '';
-
-  // Ocean background
-  html += `<rect x="0" y="0" width="800" height="600" fill="#a8d8ea" rx="0"/>`;
-
-  // Ocean waves (decorative)
-  html += `<path d="M0 480 Q50 470 100 480 Q150 490 200 480 Q250 470 300 480 Q350 490 400 480 Q450 470 500 480 Q550 490 600 480 Q650 470 700 480 Q750 490 800 480 L800 520 Q750 530 700 520 Q650 510 600 520 Q550 530 500 520 Q450 510 400 520 Q350 530 300 520 Q250 510 200 520 Q150 530 100 520 Q50 510 0 520 Z" fill="#8ec8de" opacity="0.5"/>`;
-
-  // Simplified landmass: New Territories + Kowloon
-  html += `<path d="M80 200 Q150 160 250 170 Q350 140 420 150 Q500 130 580 150 Q650 140 720 170
-    Q750 190 730 230 Q700 280 650 310 Q600 340 520 340 Q450 350 380 340
-    Q300 350 240 330 Q180 320 120 300 Q80 280 80 200 Z"
-    fill="${LAND_COLOR}" stroke="${LAND_STROKE}" stroke-width="2"/>`;
-
-  // Lantau Island
-  html += `<path d="M30 380 Q60 340 100 370 Q140 380 120 420 Q90 450 50 440 Q20 430 30 380 Z"
-    fill="${LAND_COLOR}" stroke="${LAND_STROKE}" stroke-width="2"/>`;
-
-  // Hong Kong Island
-  html += `<path d="M420 380 Q460 360 500 370 Q540 380 530 420 Q500 450 460 450 Q430 440 420 380 Z"
-    fill="${LAND_COLOR}" stroke="${LAND_STROKE}" stroke-width="2"/>`;
-
-  // Lamma Island
-  html += `<ellipse cx="440" cy="500" rx="25" ry="18" fill="${SAND_COLOR}" stroke="${LAND_STROKE}" stroke-width="1.5"/>`;
-
-  // Cheung Chau
-  html += `<ellipse cx="130" cy="490" rx="12" ry="8" fill="${SAND_COLOR}" stroke="${LAND_STROKE}" stroke-width="1.5"/>`;
-
-  // Peng Chau
-  html += `<ellipse cx="360" cy="460" rx="8" ry="5" fill="${SAND_COLOR}" stroke="${LAND_STROKE}" stroke-width="1.5"/>`;
-
-  // Mountains
-  MOUNTAINS.forEach((m, i) => {
-    const { x, y } = geoToSvg(m.lat, m.lng);
+  MOUNTAINS.forEach(m => {
     const checked = checkedIds.includes(m.id);
-    const peakColor = checked ? '#2d8a56' : '#8d6e63';
-    const bodyColor = checked ? '#4caf50' : '#9e9e9e';
-
-    html += `<g class="mountain-group ${checked ? 'checked' : ''}" data-mountain="${m.id}" id="mt-${m.id}" transform="translate(${x - 22}, ${y - 40})">`;
-    // Mountain body
-    html += `<polygon class="mountain-body" points="22,8 6,45 38,45" fill="${bodyColor}" rx="2"/>`;
-    // Snow cap (Tai Mo Shan)
-    if (m.id === 'tai-mo-shan') {
-      html += `<polygon points="17,16 22,8 27,16" fill="white" opacity="0.7"/>`;
-    }
-    // Peak highlight
-    html += `<polygon class="mountain-peak" points="17,16 22,8 27,16" fill="${peakColor}"/>`;
-    // Trees
-    html += `<circle cx="10" cy="40" r="5" fill="#388e3c" opacity="0.6"/>`;
-    html += `<circle cx="34" cy="42" r="4" fill="#388e3c" opacity="0.5"/>`;
-    // Flag (shown when checked)
-    html += `<g class="flag"><line x1="22" y1="8" x2="22" y2="-8" stroke="#c4a43e" stroke-width="1.5"/><polygon points="22,-8 30,-5 22,-2" fill="#c4a43e"/></g>`;
-    html += `</g>`;
-
-    // Label
-    html += `<text class="mountain-label" x="${x}" y="${y + 18}">${m.nameCn}</text>`;
-    html += `<text class="mountain-label-en" x="${x}" y="${y + 30}">${m.elevation}m</text>`;
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="mountain-marker ${checked ? 'checked' : ''}" title="${m.nameCn} ${m.elevation}m">🏔️</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+    const marker = L.marker([m.lat, m.lng], { icon }).addTo(map);
+    marker.bindTooltip(`${m.nameCn}<br>${m.elevation}m`, {
+      direction: 'top',
+      offset: [0, -12],
+      className: 'mountain-tooltip',
+    });
+    marker.on('click', () => openMountainModal(m.id));
+    mountainMarkers[m.id] = marker;
   });
-
-  // Hiker character
-  html += renderHiker();
-
-  svg.innerHTML = html;
-
-  // Attach click handlers to mountain groups
-  svg.querySelectorAll('.mountain-group').forEach(g => {
-    g.addEventListener('click', () => openMountainModal(g.dataset.mountain));
-  });
-}
-
-function renderHiker() {
-  const hx = 390, hy = 530; // bottom center of map
-  const isGirl = avatarGender === 'girl';
-
-  let svg = `<g class="hiker-group" id="hiker-group" transform="translate(${hx}, ${hy})">`;
-
-  // Umbrella (hidden by default, shown in rain)
-  svg += `<g class="hiker-umbrella">`;
-  svg += `<line x1="0" y1="-55" x2="0" y2="-35" stroke="#555" stroke-width="1.5"/>`;
-  svg += `<path d="M-20,-40 Q-10,-55 0,-55 Q10,-55 20,-40" fill="#ff7043" stroke="#e64a19" stroke-width="1"/>`;
-  svg += `</g>`;
-
-  // Flashlight glow (hidden by default, shown in fog)
-  svg += `<circle class="hiker-flashlight" cx="12" cy="-20" r="25" fill="rgba(255,255,200,0.3)"/>`;
-
-  // Backpack
-  svg += `<g class="hiker-backpack">`;
-  svg += `<rect x="-10" y="-32" width="18" height="20" rx="4" fill="#5d4037"/>`;
-  svg += `<rect x="-8" y="-30" width="14" height="6" rx="2" fill="#795548"/>`;
-  svg += `</g>`;
-
-  // Body
-  svg += `<g class="hiker-body">`;
-  // Torso
-  svg += `<rect x="-6" y="-20" width="12" height="18" rx="3" fill="${isGirl ? '#e91e63' : '#1565c0'}"/>`;
-  // Head
-  svg += `<circle cx="0" cy="-26" r="8" fill="#ffccbc"/>`;
-  // Hat
-  svg += `<ellipse cx="0" cy="-32" rx="12" ry="3" fill="#795548"/>`;
-  svg += `<rect x="-6" y="-37" width="12" height="5" rx="3" fill="#795548"/>`;
-  // Hair
-  if (isGirl) {
-    svg += `<path d="M-8,-30 Q-14,-28 -12,-22" stroke="#333" stroke-width="2" fill="none"/>`;
-    svg += `<path d="M8,-30 Q14,-28 12,-22" stroke="#333" stroke-width="2" fill="none"/>`;
-  }
-  // Face (simple smile)
-  svg += `<circle cx="-3" cy="-27" r="1" fill="#333"/>`;
-  svg += `<circle cx="3" cy="-27" r="1" fill="#333"/>`;
-  svg += `<path d="M-3,-23 Q0,-21 3,-23" stroke="#333" stroke-width="0.8" fill="none"/>`;
-  svg += `</g>`;
-
-  // Left leg
-  svg += `<g class="hiker-left-leg">`;
-  svg += `<rect x="-5" y="-2" width="5" height="14" rx="2" fill="#616161"/>`;
-  svg += `<rect x="-6" y="10" width="7" height="4" rx="2" fill="#424242"/>`;
-  svg += `</g>`;
-
-  // Right leg
-  svg += `<g class="hiker-right-leg">`;
-  svg += `<rect x="0" y="-2" width="5" height="14" rx="2" fill="#757575"/>`;
-  svg += `<rect x="-1" y="10" width="7" height="4" rx="2" fill="#424242"/>`;
-  svg += `</g>`;
-
-  // Hiking pole
-  svg += `<g class="hiker-pole">`;
-  svg += `<line x1="12" y1="-15" x2="18" y2="12" stroke="#888" stroke-width="1.5"/>`;
-  svg += `<circle cx="18" cy="13" r="1.5" fill="#555"/>`;
-  svg += `</g>`;
-
-  svg += `</g>`;
-  return svg;
 }
 
 // ============================================
@@ -1471,40 +1250,12 @@ async function handleCheckin(mountain) {
 }
 
 function celebrateCheckin(mountain) {
-  // 1. Confetti from mountain position
   if (typeof confetti !== 'undefined') {
     const colors = ['#2d8a56', '#5b9bd5', '#c4a43e', '#e8ece9'];
-    confetti({
-      particleCount: 120,
-      spread: 70,
-      origin: { x: 0.5, y: 0.4 },
-      colors,
-    });
+    confetti({ particleCount: 120, spread: 70, origin: { x: 0.5, y: 0.4 }, colors });
     setTimeout(() => {
       confetti({ particleCount: 60, spread: 50, origin: { x: 0.5, y: 0.4 }, colors });
     }, 300);
-  }
-
-  // 2. Animate the mountain on the map
-  const mtGroup = document.getElementById(`mt-${mountain.id}`);
-  if (mtGroup && typeof anime !== 'undefined') {
-    anime({
-      targets: mtGroup,
-      scale: [1, 1.3, 1],
-      duration: 600,
-      easing: 'easeOutElastic(1, .5)',
-    });
-  }
-
-  // 3. Hiker jumps
-  const hiker = document.getElementById('hiker-group');
-  if (hiker && typeof anime !== 'undefined') {
-    anime({
-      targets: hiker,
-      translateY: [-10, 0],
-      duration: 400,
-      easing: 'easeOutQuad',
-    });
   }
 }
 
@@ -1527,18 +1278,6 @@ function openCertificate(mountain) {
   $('#cert-number').textContent = certNum;
 
   $('#cert-overlay').classList.add('active');
-
-  // Animate in
-  const card = $('#cert-card');
-  if (typeof anime !== 'undefined') {
-    anime({
-      targets: card,
-      translateY: [40, 0],
-      opacity: [0, 1],
-      duration: 500,
-      easing: 'easeOutQuint',
-    });
-  }
 }
 
 $('#btn-close-cert').addEventListener('click', () => {
@@ -1667,138 +1406,22 @@ function showBadgeToast(achievement) {
 }
 
 // ============================================
-// WEATHER
+// WEATHER (temperature only)
 // ============================================
-const WEATHER_EFFECTS = {
-  // WMO code range → effect
-  sunny: [0],
-  partlyCloudy: [1, 2, 3],
-  fog: [45, 48],
-  drizzle: [51, 52, 53, 54, 55],
-  rain: [61, 62, 63, 64, 65, 80, 81, 82],
-  thunderstorm: [95, 96, 99],
-};
-
-function getWeatherType(code) {
-  for (const [type, codes] of Object.entries(WEATHER_EFFECTS)) {
-    if (codes.includes(code)) return type;
-  }
-  return 'partlyCloudy';
-}
-
 async function fetchWeather() {
   try {
-    const resp = await fetch('https://api.open-meteo.com/v1/forecast?latitude=22.3&longitude=114.2&current=weather_code,temperature_2m,wind_speed_10m');
+    const resp = await fetch('https://api.open-meteo.com/v1/forecast?latitude=22.3&longitude=114.2&current=temperature_2m');
     const data = await resp.json();
-    const code = data.current?.weather_code ?? 1;
     const temp = data.current?.temperature_2m;
-    const type = getWeatherType(code);
-    applyWeatherEffect(type, temp);
+    if (temp != null) {
+      $('#weather-temp').textContent = `${Math.round(temp)}°C 香港`;
+    }
   } catch {
-    // Fallback to partly cloudy
-    applyWeatherEffect('partlyCloudy', null);
+    $('#weather-temp').textContent = '香港';
   }
 }
 
-function applyWeatherEffect(type, temp) {
-  const layer = $('#weather-layer');
-  let html = '';
-
-  // Temperature badge
-  if (temp != null) {
-    $('#weather-temp').textContent = `${Math.round(temp)}°C`;
-  }
-
-  switch (type) {
-    case 'sunny':
-      html += `<div class="weather-sun"></div>`;
-      html += generateClouds(2);
-      break;
-    case 'partlyCloudy':
-      html += `<div class="weather-sun" style="opacity:0.7; top:8%; right:12%;"></div>`;
-      html += generateClouds(5);
-      break;
-    case 'fog':
-      html += `<div class="weather-fog active"></div>`;
-      html += generateClouds(3);
-      break;
-    case 'drizzle':
-      html += `<div class="weather-rain active"></div>`;
-      html += `<div class="weather-dark-clouds active"></div>`;
-      html += generateClouds(4);
-      break;
-    case 'rain':
-      html += `<div class="weather-heavy-rain active"></div>`;
-      html += `<div class="weather-dark-clouds active"></div>`;
-      html += generateClouds(5);
-      break;
-    case 'thunderstorm':
-      html += `<div class="weather-heavy-rain active"></div>`;
-      html += `<div class="weather-dark-clouds active" style="background:linear-gradient(180deg, rgba(40,45,55,0.7) 0%, rgba(60,65,75,0.5) 50%, transparent 100%);"></div>`;
-      html += `<div class="weather-lightning" id="lightning"></div>`;
-      html += generateClouds(5);
-      // Lightning flashes
-      startLightning();
-      break;
-  }
-
-  layer.innerHTML = html;
-
-  // Update hiker weather state
-  updateHikerWeather(type);
-}
-
-function generateClouds(count) {
-  let html = '';
-  for (let i = 0; i < count; i++) {
-    const top = 5 + Math.random() * 25;
-    const size = 40 + Math.random() * 60;
-    const delay = Math.random() * 15;
-    const duration = 12 + Math.random() * 18;
-    html += `<div class="weather-cloud" style="
-      top:${top}%; width:${size}px; height:${size * 0.55}px;
-      animation-delay:-${delay}s; animation-duration:${duration}s;
-    "></div>`;
-  }
-  return html;
-}
-
-let lightningInterval = null;
-function startLightning() {
-  if (lightningInterval) clearInterval(lightningInterval);
-  lightningInterval = setInterval(() => {
-    const el = document.getElementById('lightning');
-    if (!el) return;
-    el.classList.add('flash');
-    setTimeout(() => el.classList.remove('flash'), 50 + Math.random() * 100);
-  }, 2000 + Math.random() * 4000);
-}
-
-// Stop lightning when weather changes
-function clearWeatherTimers() {
-  if (lightningInterval) { clearInterval(lightningInterval); lightningInterval = null; }
-}
-
-function updateHikerWeather(type) {
-  const hiker = document.getElementById('hiker-group');
-  if (!hiker) return;
-  hiker.classList.remove('raining', 'foggy', 'fast');
-  if (type === 'rain' || type === 'drizzle' || type === 'thunderstorm') {
-    hiker.classList.add('raining');
-  }
-  if (type === 'fog') {
-    hiker.classList.add('foggy');
-  }
-  if (type === 'thunderstorm') {
-    hiker.classList.add('fast');
-  }
-}
-
-// Weather refresh every 30 minutes
-setInterval(() => {
-  clearWeatherTimers();
-  fetchWeather();
-}, 30 * 60 * 1000);
+setInterval(fetchWeather, 30 * 60 * 1000);
 
 // ============================================
 // UTILITY
@@ -1807,13 +1430,6 @@ function formatDate(date) {
   const d = date instanceof Date ? date : new Date(date);
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 }
-
-// ============================================
-// SVG COLOR CONSTANTS
-// ============================================
-const LAND_COLOR = '#c8e6c9';
-const LAND_STROKE = '#a5d6a7';
-const SAND_COLOR = '#ffe0b2';
 
 // ============================================
 // INIT
