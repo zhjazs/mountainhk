@@ -4,11 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>香港山脉打卡 | HK Mountain Check-in</title>
-<meta name="description" content="踏遍香港群山，記錄你的山野旅程。卡通地圖 × 實時天氣 × 成就徽章。">
+<meta name="description" content="踏遍香港群山，記錄你的山野旅程。真實地圖 × 12座山峰打卡 × 成就徽章。">
 <meta property="og:title" content="香港山脉打卡">
-<meta property="og:description" content="卡通地圖 × 實時天氣 × 成就徽章，記錄你的香港登山之旅。">
+<meta property="og:description" content="真實地圖 × 12座山峰打卡 × 成就徽章，記錄你的香港登山之旅。">
 <meta property="og:type" content="website">
-<meta name="theme-color" content="#0d1f17">
+<meta name="theme-color" content="#0b1a14">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏔️</text></svg>">
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="preconnect" href="https://unpkg.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -274,11 +275,12 @@ h2 { font-size: 1.25rem; font-weight: 600; }
    STATS PANEL
    ============================================ */
 .stats-panel {
-  display: flex; gap: 0; margin: 0;
-  background: var(--bg-surface);
-  border-radius: 0;
-  border-top: 1px solid rgba(255,255,255,0.06);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; gap: 0;
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 500;
+  background: rgba(11,26,20,0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(255,255,255,0.08);
   overflow: hidden;
 }
 
@@ -693,14 +695,12 @@ async function loadAllScripts() {
     let loaded = false;
     for (let i = 0; i < lib.urls.length; i++) {
       try {
-        console.log(`[hkmountain] 加載 ${lib.name} [源${i+1}]: ${new URL(lib.urls[i]).hostname}`);
         showLoadingMsg(`加載 ${lib.name}...`);
         await loadScript(lib.urls[i]);
-        console.log(`[hkmountain] ${lib.name} ✓`);
         loaded = true;
         break;
       } catch (e) {
-        console.warn(`[hkmountain] ${lib.name} 源${i+1} 失敗: ${e.message}`);
+        // CDN source failed, try next
       }
     }
     if (!loaded) {
@@ -881,13 +881,13 @@ const supabase = {
 // APP INITIALIZATION
 // ============================================
 async function initApp() {
-  console.log('[hkmountain] 初始化開始...');
+  // [hkmountain] 初始化開始...');
   showLoadingMsg('正在連接伺服器...');
 
   // Load optional CDN scripts (anime, confetti, html2canvas)
   try {
     await loadAllScripts();
-    console.log('[hkmountain] 所有 CDN 加載完成');
+    // [hkmountain] 所有 CDN 加載完成');
   } catch (e) {
     console.warn('[hkmountain] 部分 CDN 加載失敗 (動畫效果可能受限):', e.message);
     // Continue anyway — animations are optional enhancements
@@ -896,10 +896,10 @@ async function initApp() {
   // Restore session from localStorage
   const hasSession = loadSession();
   if (hasSession) {
-    console.log('[hkmountain] 恢復會話...');
+    // [hkmountain] 恢復會話...');
     const { data: user } = await api.getUser();
     if (user) {
-      console.log('[hkmountain] 會話有效');
+      // [hkmountain] 會話有效');
       await loadProfile();
       await loadCheckins();
       showView('app');
@@ -913,7 +913,7 @@ async function initApp() {
       showLoadingMsg('準備就緒');
       return;
     }
-    console.log('[hkmountain] 會話已過期');
+    // [hkmountain] 會話已過期');
   }
 
   showView('login');
@@ -1055,7 +1055,7 @@ function showView(view) {
 $('#btn-login').addEventListener('click', async () => {
   if (!supabase) { $('#login-error').textContent = '系統初始化中，請稍候...'; return; }
   const email = $('#login-email').value.trim();
-  console.log('[hkmountain] 登錄按鈕被點擊');
+  // [hkmountain] 登錄按鈕被點擊');
   const password = $('#login-password').value;
   if (!email || !password) {
     $('#login-error').textContent = '請填寫所有欄位';
@@ -1071,11 +1071,11 @@ $('#btn-login').addEventListener('click', async () => {
 // Register
 $('#btn-register').addEventListener('click', async () => {
   if (!supabase) { $('#register-error').textContent = '系統初始化中，請稍候...'; return; }
-  console.log('[hkmountain] 註冊按鈕被點擊');
+  // [hkmountain] 註冊按鈕被點擊');
   const username = $('#reg-username').value.trim();
   const email = $('#reg-email').value.trim();
   const password = $('#reg-password').value;
-  console.log('[hkmountain] 註冊資料:', { username, email, passwordLength: password.length, avatarGender });
+  // [hkmountain] 註冊資料:', { username, email, passwordLength: password.length, avatarGender });
   if (!username || !email || !password) {
     $('#register-error').textContent = '請填寫所有欄位';
     return;
@@ -1087,9 +1087,9 @@ $('#btn-register').addEventListener('click', async () => {
   $('#register-error').textContent = '';
   $('#btn-register').textContent = '註冊中...';
   $('#btn-register').disabled = true;
-  console.log('[hkmountain] 調用 supabase.auth.signUp...');
+  // [hkmountain] 調用 supabase.auth.signUp...');
   const { data, error } = await supabase.auth.signUp({ email, password });
-  console.log('[hkmountain] signUp 結果:', { data: !!data, error: error?.message });
+  // [hkmountain] signUp 結果:', { data: !!data, error: error?.message });
   if (error) {
     $('#register-error').textContent = error.message.includes('already registered')
       ? '此郵箱已被註冊' : error.message;
@@ -1098,13 +1098,13 @@ $('#btn-register').addEventListener('click', async () => {
     return;
   }
   if (data.user) {
-    console.log('[hkmountain] 用戶創建成功，寫入 profiles...');
+    // [hkmountain] 用戶創建成功，寫入 profiles...');
     const { error: profileError } = await supabase.from('profiles').insert({
       id: data.user.id,
       username,
       avatar_gender: avatarGender
     });
-    console.log('[hkmountain] profiles 寫入:', { error: profileError?.message });
+    // [hkmountain] profiles 寫入:', { error: profileError?.message });
   }
   $('#btn-register').textContent = '註 冊';
   $('#btn-register').disabled = false;
@@ -1131,7 +1131,7 @@ $('#btn-logout').addEventListener('click', async () => {
 // Auth state listener
 supabase.auth.onAuthStateChange(async (event, session) => {
   if (session?.user && currentUserId) {
-    console.log('[hkmountain] 用戶已登入:', currentUserId);
+    // [hkmountain] 用戶已登入:', currentUserId);
     await loadProfile();
     await loadCheckins();
     showView('app');
@@ -1141,7 +1141,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     renderBadges();
     fetchWeather();
   } else {
-    console.log('[hkmountain] 用戶已登出');
+    // [hkmountain] 用戶已登出');
     currentProfile = null;
     checkins = [];
     showView('login');
