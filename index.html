@@ -736,41 +736,62 @@ h2 { font-size: 1.25rem; font-weight: 600; }
 
 <script>
 // ============================================
-// DYNAMIC SCRIPT LOADER (with China-friendly fallbacks)
+// DYNAMIC SCRIPT LOADER (China-friendly CDN strategy)
 // ============================================
 const CDN_SCRIPTS = [
-  { name: 'supabase',  primary: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js', fallback: 'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js' },
-  { name: 'anime',     primary: 'https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js',          fallback: 'https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.min.js' },
-  { name: 'confetti',  primary: 'https://cdn.jsdelivr.net/npm/canvas-confetti@1/dist/confetti.browser.min.js', fallback: 'https://unpkg.com/canvas-confetti@1/dist/confetti.browser.min.js' },
-  { name: 'html2canvas', primary: 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', fallback: 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js' },
+  // Try unpkg first (works in China), then jsdelivr (fast global), then cdnjs
+  { name: 'supabase',  urls: [
+    'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+  ]},
+  { name: 'anime', urls: [
+    'https://unpkg.com/animejs@3.2.2/lib/anime.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js',
+  ]},
+  { name: 'confetti', urls: [
+    'https://unpkg.com/canvas-confetti@1/dist/confetti.browser.min.js',
+    'https://cdn.jsdelivr.net/npm/canvas-confetti@1/dist/confetti.browser.min.js',
+  ]},
+  { name: 'html2canvas', urls: [
+    'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js',
+    'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
+  ]},
 ];
 
-function loadScript(src, timeout = 8000) {
+function loadScript(src, timeout = 5000) {
   return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = src;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load: ${src}`));
-    const timer = setTimeout(() => { script.remove(); reject(new Error(`Timeout: ${src}`)); }, timeout);
-    script.addEventListener('load', () => clearTimeout(timer));
-    document.head.appendChild(script);
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => { s.remove(); reject(new Error('load error')); };
+    const t = setTimeout(() => { s.remove(); reject(new Error('timeout')); }, timeout);
+    s.addEventListener('load', () => clearTimeout(t));
+    document.head.appendChild(s);
   });
 }
 
+function showLoadingMsg(msg) {
+  const el = document.getElementById('loading-msg');
+  if (el) el.textContent = msg;
+}
+
 async function loadAllScripts() {
-  for (const s of CDN_SCRIPTS) {
-    try {
-      console.log(`[hkmountain] 加載 ${s.name}: primary...`);
-      await loadScript(s.primary);
-      console.log(`[hkmountain] ${s.name} ✓`);
-    } catch (e) {
-      console.warn(`[hkmountain] ${s.name} primary 失敗, 嘗試 fallback...`);
+  for (const lib of CDN_SCRIPTS) {
+    let loaded = false;
+    for (let i = 0; i < lib.urls.length; i++) {
       try {
-        await loadScript(s.fallback);
-        console.log(`[hkmountain] ${s.name} fallback ✓`);
-      } catch (e2) {
-        throw new Error(`無法加載 ${s.name}，請檢查網絡連接`);
+        console.log(`[hkmountain] 加載 ${lib.name} [源${i+1}]: ${new URL(lib.urls[i]).hostname}`);
+        showLoadingMsg(`加載 ${lib.name}...`);
+        await loadScript(lib.urls[i]);
+        console.log(`[hkmountain] ${lib.name} ✓`);
+        loaded = true;
+        break;
+      } catch (e) {
+        console.warn(`[hkmountain] ${lib.name} 源${i+1} 失敗: ${e.message}`);
       }
+    }
+    if (!loaded) {
+      throw new Error(`無法加載 ${lib.name}，請檢查網絡連接`);
     }
   }
 }
