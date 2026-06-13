@@ -453,17 +453,11 @@ h2 { font-size: 1.25rem; font-weight: 600; }
    RESPONSIVE
    ============================================ */
 @media (max-width: 640px) {
-  :root { --map-height: 55vh; }
-  .stats-panel { margin: 0 0.75rem; border-radius: 0; }
-  .badge-grid { grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
-  .modal-card { width: 94%; padding: 1.25rem; }
+  .auth-card { padding: 2rem 1.5rem; }
+  .badge-grid { grid-template-columns: repeat(4, 1fr); gap: 0.375rem; }
+  .modal-card { width: 94%; padding: 1.25rem; border-radius: var(--radius-card); }
   .cert-card { width: 260px; height: 347px; }
-}
-
-@media (min-width: 1024px) {
-  :root { --map-height: 75vh; }
-  .app-main { max-width: 900px; margin: 0 auto; }
-  .stats-panel { max-width: 500px; margin: 0 auto; }
+  .achievements-section { padding: 1.25rem 0.75rem 2rem; }
 }
 
 /* ============================================
@@ -881,13 +875,13 @@ const supabase = {
 // APP INITIALIZATION
 // ============================================
 async function initApp() {
-  // [hkmountain] 初始化開始...');
+初始化開始...');
   showLoadingMsg('正在連接伺服器...');
 
   // Load optional CDN scripts (anime, confetti, html2canvas)
   try {
     await loadAllScripts();
-    // [hkmountain] 所有 CDN 加載完成');
+  所有 CDN 加載完成');
   } catch (e) {
     console.warn('[hkmountain] 部分 CDN 加載失敗 (動畫效果可能受限):', e.message);
     // Continue anyway — animations are optional enhancements
@@ -896,10 +890,10 @@ async function initApp() {
   // Restore session from localStorage
   const hasSession = loadSession();
   if (hasSession) {
-    // [hkmountain] 恢復會話...');
+  恢復會話...');
     const { data: user } = await api.getUser();
     if (user) {
-      // [hkmountain] 會話有效');
+    會話有效');
       await loadProfile();
       await loadCheckins();
       showView('app');
@@ -913,7 +907,7 @@ async function initApp() {
       showLoadingMsg('準備就緒');
       return;
     }
-    // [hkmountain] 會話已過期');
+  會話已過期');
   }
 
   showView('login');
@@ -1055,27 +1049,23 @@ function showView(view) {
 $('#btn-login').addEventListener('click', async () => {
   if (!supabase) { $('#login-error').textContent = '系統初始化中，請稍候...'; return; }
   const email = $('#login-email').value.trim();
-  // [hkmountain] 登錄按鈕被點擊');
   const password = $('#login-password').value;
-  if (!email || !password) {
-    $('#login-error').textContent = '請填寫所有欄位';
-    return;
-  }
+  if (!email || !password) { $('#login-error').textContent = '請填寫所有欄位'; return; }
+  $('#login-error').textContent = '';
+  $('#btn-login').textContent = '登錄中...'; $('#btn-login').disabled = true;
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    $('#login-error').textContent = error.message === 'Invalid login credentials'
-      ? '郵箱或密碼錯誤' : error.message;
+    $('#login-error').textContent = error.message === 'Invalid login credentials' ? '郵箱或密碼錯誤' : error.message;
+    $('#btn-login').textContent = '登 錄'; $('#btn-login').disabled = false;
   }
 });
 
 // Register
 $('#btn-register').addEventListener('click', async () => {
   if (!supabase) { $('#register-error').textContent = '系統初始化中，請稍候...'; return; }
-  // [hkmountain] 註冊按鈕被點擊');
   const username = $('#reg-username').value.trim();
   const email = $('#reg-email').value.trim();
   const password = $('#reg-password').value;
-  // [hkmountain] 註冊資料:', { username, email, passwordLength: password.length, avatarGender });
   if (!username || !email || !password) {
     $('#register-error').textContent = '請填寫所有欄位';
     return;
@@ -1084,12 +1074,8 @@ $('#btn-register').addEventListener('click', async () => {
     $('#register-error').textContent = '密碼至少需要 6 位';
     return;
   }
-  $('#register-error').textContent = '';
-  $('#btn-register').textContent = '註冊中...';
-  $('#btn-register').disabled = true;
-  // [hkmountain] 調用 supabase.auth.signUp...');
+  $('#btn-register').textContent = '註冊中...'; $('#btn-register').disabled = true;
   const { data, error } = await supabase.auth.signUp({ email, password });
-  // [hkmountain] signUp 結果:', { data: !!data, error: error?.message });
   if (error) {
     $('#register-error').textContent = error.message.includes('already registered')
       ? '此郵箱已被註冊' : error.message;
@@ -1098,13 +1084,11 @@ $('#btn-register').addEventListener('click', async () => {
     return;
   }
   if (data.user) {
-    // [hkmountain] 用戶創建成功，寫入 profiles...');
-    const { error: profileError } = await supabase.from('profiles').insert({
+    await supabase.from('profiles').insert({
       id: data.user.id,
       username,
       avatar_gender: avatarGender
     });
-    // [hkmountain] profiles 寫入:', { error: profileError?.message });
   }
   $('#btn-register').textContent = '註 冊';
   $('#btn-register').disabled = false;
@@ -1131,7 +1115,7 @@ $('#btn-logout').addEventListener('click', async () => {
 // Auth state listener
 supabase.auth.onAuthStateChange(async (event, session) => {
   if (session?.user && currentUserId) {
-    // [hkmountain] 用戶已登入:', currentUserId);
+  用戶已登入:', currentUserId);
     await loadProfile();
     await loadCheckins();
     showView('app');
@@ -1141,7 +1125,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     renderBadges();
     fetchWeather();
   } else {
-    // [hkmountain] 用戶已登出');
+  用戶已登出');
     currentProfile = null;
     checkins = [];
     showView('login');
