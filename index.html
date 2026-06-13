@@ -739,11 +739,6 @@ h2 { font-size: 1.25rem; font-weight: 600; }
 // DYNAMIC SCRIPT LOADER (China-friendly CDN strategy)
 // ============================================
 const CDN_SCRIPTS = [
-  // Try unpkg first (works in China), then jsdelivr (fast global), then cdnjs
-  { name: 'supabase',  urls: [
-    'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js',
-    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
-  ]},
   { name: 'anime', urls: [
     'https://unpkg.com/animejs@3.2.2/lib/anime.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js',
@@ -803,23 +798,207 @@ const SUPABASE_URL = 'https://rqtudoxxkwqsfihsylbw.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxdHVkb3h4a3dxc2ZpaHN5bGJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNTI2NjQsImV4cCI6MjA5NjkyODY2NH0.szAdVQwGK6d9FPPwUqA-LU5Kck5xMs15B7_Mre8jzFY';
 
 // ============================================
-// SUPABASE CLIENT
+// SUPABASE API (raw fetch — no CDN dependency)
 // ============================================
-let supabase;
+let authToken = null;
+let currentUserId = null;
 
+const api = {
+  headers(more = {}) {
+    const h = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+    };
+    if (authToken) h['Authorization'] = `Bearer ${authToken}`;
+    Object.assign(h, more);
+    return h;
+  },
+
+  // --- Auth ---
+  async signUp(email, password) {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: 'POST', headers: this.headers(), body: JSON.stringify({ email, password }),
+    });
+    const data = await r.json();
+    if (!r.ok) return { error: { message: data.msg || data.message || '註冊失敗' } };
+    if (data.access_token) { authToken = data.access_token; currentUserId = data.user.id; }
+    return { data: { user: data.user, session: { access_token: data.access_token } }, error: null };
+  },
+
+  async signIn(email, password) {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST', headers: this.headers(), body: JSON.stringify({ email, password }),
+    });
+    const data = await r.json();
+    if (!r.ok) return { error: { message: data.error_description || data.msg || '登錄失敗' } };
+    authToken = data.access_token; currentUserId = data.user.id;
+    return { data: { user: data.user, session: { access_token: data.access_token } }, error: null };
+  },
+
+  async signOut() {
+    if (authToken) {
+      await fetch(`${SUPABASE_URL}/auth/v1/logout`, { method: 'POST', headers: this.headers() });
+    }
+    authToken = null; currentUserId = null;
+  },
+
+  async getUser() {
+    if (!authToken) return { data: null, error: { message: '未登錄' } };
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: this.headers() });
+    const data = await r.json();
+    if (!r.ok) { authToken = null; currentUserId = null; return { data: null, error: data }; }
+    currentUserId = data.id;
+    return { data, error: null };
+  },
+
+  // --- Database ---
+  async select(table, query = '*') {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(query)}`, {
+      headers: this.headers(),
+    });
+    return { data: await r.json(), error: null };
+  },
+
+  async insert(table, row) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: this.headers({ 'Prefer': 'return=representation' }),
+      body: JSON.stringify(row),
+    });
+    if (!r.ok) {
+      const err = await r.json();
+      return { error: { message: err.message, code: err.code } };
+    }
+    return { data: await r.json(), error: null };
+  },
+
+  async delete(table, column, value) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${column}=eq.${encodeURIComponent(value)}`, {
+      method: 'DELETE',
+      headers: this.headers(),
+    });
+    return { error: r.ok ? null : { message: 'Delete failed' } };
+  },
+};
+
+// ============================================
+// SESSION PERSISTENCE + AUTH STATE
+// ============================================
+const SESSION_KEY = 'hkmountain_session';
+
+function saveSession() {
+  if (authToken && currentUserId) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ token: authToken, userId: currentUserId }));
+  }
+}
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (raw) { const s = JSON.parse(raw); authToken = s.token; currentUserId = s.userId; return true; }
+  } catch(e) {}
+  return false;
+}
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+  authToken = null; currentUserId = null;
+}
+
+// Auth state listener (simplified: call callback on login/logout)
+let _onAuthChange = null;
+function onAuthChange(cb) { _onAuthChange = cb; }
+function notifyAuthChange(event) {
+  if (_onAuthChange) _onAuthChange(event, authToken ? { user: { id: currentUserId } } : null);
+}
+
+// Override api to include session persistence
+const _signIn = api.signIn.bind(api);
+const _signUp = api.signUp.bind(api);
+const _signOut = api.signOut.bind(api);
+
+api.signIn = async function(email, password) {
+  const result = await _signIn(email, password);
+  if (!result.error) { saveSession(); notifyAuthChange('SIGNED_IN'); }
+  return result;
+};
+api.signUp = async function(email, password) {
+  const result = await _signUp(email, password);
+  if (!result.error) { saveSession(); notifyAuthChange('SIGNED_UP'); }
+  return result;
+};
+api.signOut = async function() {
+  await _signOut();
+  clearSession();
+  notifyAuthChange('SIGNED_OUT');
+};
+api.getUser = async function() {
+  if (!authToken) return { data: null };
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: api.headers() });
+  if (!r.ok) { clearSession(); notifyAuthChange('SIGNED_OUT'); return { data: null }; }
+  const data = await r.json();
+  currentUserId = data.id;
+  return { data };
+};
+
+// Compatibility shortcuts
+const supabase = {
+  auth: {
+    signInWithPassword: (o) => api.signIn(o.email, o.password),
+    signUp: (o) => api.signUp(o.email, o.password),
+    signOut: () => api.signOut(),
+    onAuthStateChange: (cb) => { onAuthChange(cb); return { data: { subscription: { unsubscribe: () => {} } } }; },
+    getSession: () => Promise.resolve({ data: { session: authToken ? { user: { id: currentUserId } } : null } }),
+  },
+  from: (table) => ({
+    select: (q) => api.select(table, q || '*'),
+    insert: (row) => api.insert(table, row),
+    delete: () => ({
+      eq: (col, val) => api.delete(table, col, val),
+    }),
+    // helpers for filtering
+    eq: function(col, val) { this._col = col; this._val = val; return this; },
+  }),
+};
+
+// ============================================
+// APP INITIALIZATION
+// ============================================
 async function initApp() {
   console.log('[hkmountain] 初始化開始...');
+  showLoadingMsg('正在連接伺服器...');
+
+  // Load optional CDN scripts (anime, confetti, html2canvas)
   try {
     await loadAllScripts();
     console.log('[hkmountain] 所有 CDN 加載完成');
   } catch (e) {
-    console.error('[hkmountain] CDN 加載失敗:', e.message);
-    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0d1f17;color:#e8ece9;font-family:sans-serif;text-align:center;padding:2rem;"><div><h1>😵 載入失敗</h1><p style="color:#9ab5a4;margin-top:0.5rem;">${e.message}</p><p style="color:#5c7a66;font-size:0.875rem;margin-top:1rem;">請檢查網絡連接後刷新頁面</p></div></div>`;
-    return;
+    console.warn('[hkmountain] 部分 CDN 加載失敗 (動畫效果可能受限):', e.message);
+    // Continue anyway — animations are optional enhancements
   }
 
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  console.log('[hkmountain] Supabase client 創建成功');
+  // Restore session from localStorage
+  const hasSession = loadSession();
+  if (hasSession) {
+    console.log('[hkmountain] 恢復會話...');
+    const { data: user } = await api.getUser();
+    if (user) {
+      console.log('[hkmountain] 會話有效');
+      await loadProfile();
+      await loadCheckins();
+      showView('app');
+      updateNav();
+      renderMap();
+      renderBadges();
+      updateStats();
+      fetchWeather();
+      showLoadingMsg('準備就緒');
+      return;
+    }
+    console.log('[hkmountain] 會話已過期');
+  }
+
+  showView('login');
+  showLoadingMsg('準備就緒，請登錄或註冊');
+} // end initApp
 
 // ============================================
 // MOUNTAIN DATA
@@ -867,17 +1046,56 @@ function hasAllRegion(checkins, region) {
 // ============================================
 // GLOBAL STATE
 // ============================================
-let currentUser = null;
 let currentProfile = null;
 let checkins = [];
 let currentMountain = null;
 let avatarGender = 'boy';
 
 // ============================================
-// DOM REFS
+// DATA LAYER (raw Supabase API)
 // ============================================
-const $ = (s) => document.querySelector(s);
-const $$ = (s) => document.querySelectorAll(s);
+async function loadCheckins() {
+  if (!currentUserId) return;
+  const { data } = await api.select('checkins', 'mountain_id, checked_at');
+  // Filter for current user (RLS handles this, but filter just in case)
+  checkins = (data || []).filter(c => c.user_id === currentUserId);
+}
+
+async function doCheckin(mountainId) {
+  if (!currentUserId) return false;
+  const { error } = await api.insert('checkins', {
+    user_id: currentUserId,
+    mountain_id: mountainId
+  });
+  if (error) return false;
+  await loadCheckins();
+  return true;
+}
+
+async function undoCheckin(mountainId) {
+  if (!currentUserId) return false;
+  await api.delete('checkins', 'mountain_id', mountainId);
+  await loadCheckins();
+  return true;
+}
+
+async function loadProfile() {
+  if (!currentUserId) return null;
+  const { data } = await api.select('profiles', '*');
+  const profiles = (data || []).filter(p => p.id === currentUserId);
+  currentProfile = profiles[0] || null;
+  avatarGender = currentProfile?.avatar_gender || 'boy';
+  return currentProfile;
+}
+
+function isChecked(mountainId) {
+  return checkins.some(c => c.mountain_id === mountainId);
+}
+
+function getCheckinDate(mountainId) {
+  const c = checkins.find(c => c.mountain_id === mountainId);
+  return c ? new Date(c.checked_at) : null;
+}
 
 // ============================================
 // AUTH
@@ -973,12 +1191,9 @@ $('#btn-logout').addEventListener('click', async () => {
 
 // Auth state listener
 supabase.auth.onAuthStateChange(async (event, session) => {
-  if (session?.user) {
-    currentUser = session.user;
-    const { data: profile } = await supabase.from('profiles')
-      .select('*').eq('id', currentUser.id).single();
-    currentProfile = profile;
-    avatarGender = profile?.avatar_gender || 'boy';
+  if (session?.user && currentUserId) {
+    console.log('[hkmountain] 用戶已登入:', currentUserId);
+    await loadProfile();
     await loadCheckins();
     showView('app');
     updateNav();
@@ -987,7 +1202,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     updateStats();
     fetchWeather();
   } else {
-    currentUser = null;
+    console.log('[hkmountain] 用戶已登出');
     currentProfile = null;
     checkins = [];
     showView('login');
@@ -1000,50 +1215,6 @@ function updateNav() {
 }
 
 // ============================================
-// DATA LAYER
-// ============================================
-async function loadCheckins() {
-  if (!currentUser) return;
-  const { data } = await supabase.from('checkins')
-    .select('mountain_id, checked_at')
-    .eq('user_id', currentUser.id);
-  checkins = data || [];
-}
-
-async function doCheckin(mountainId) {
-  if (!currentUser) return false;
-  const { error } = await supabase.from('checkins').insert({
-    user_id: currentUser.id,
-    mountain_id: mountainId
-  });
-  if (error) {
-    if (error.code === '23505') return false; // duplicate
-    console.error('Checkin error:', error);
-    return false;
-  }
-  await loadCheckins();
-  return true;
-}
-
-async function undoCheckin(mountainId) {
-  if (!currentUser) return false;
-  await supabase.from('checkins')
-    .delete()
-    .eq('user_id', currentUser.id)
-    .eq('mountain_id', mountainId);
-  await loadCheckins();
-  return true;
-}
-
-function isChecked(mountainId) {
-  return checkins.some(c => c.mountain_id === mountainId);
-}
-
-function getCheckinDate(mountainId) {
-  const c = checkins.find(c => c.mountain_id === mountainId);
-  return c ? new Date(c.checked_at) : null;
-}
-
 // ============================================
 // SVG MAP RENDERING
 // ============================================
@@ -1624,16 +1795,6 @@ document.addEventListener('keydown', (e) => {
     $('#cert-overlay').classList.remove('active');
   }
 });
-
-  // Enable buttons now that everything is ready
-  const loadingMsg = document.getElementById('loading-msg');
-  if (loadingMsg) loadingMsg.textContent = '準備就緒，請登錄或註冊';
-  const btnLogin = document.getElementById('btn-login');
-  if (btnLogin) btnLogin.textContent = '登 錄';
-  const btnRegister = document.getElementById('btn-register');
-  if (btnRegister) btnRegister.textContent = '註 冊';
-
-} // end initApp
 
 // Start the app
 initApp();
