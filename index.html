@@ -900,9 +900,11 @@ async function initApp() {
       await loadCheckins();
       showView('app');
       updateNav();
-      renderMap();
-      renderBadges();
-      updateStats();
+      setTimeout(() => {
+        renderMap();
+        renderBadges();
+        updateStats();
+      }, 100);
       fetchWeather();
       showLoadingMsg('準備就緒');
       return;
@@ -1115,9 +1117,11 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     await loadCheckins();
     showView('app');
     updateNav();
-    renderMap();
-    renderBadges();
-    updateStats();
+    setTimeout(() => {
+      renderMap();
+      updateStats();
+      renderBadges();
+    }, 100);
     fetchWeather();
   } else {
     console.log('[hkmountain] 用戶已登出');
