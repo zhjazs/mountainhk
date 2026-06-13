@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>香港山脉打卡 | HK Mountain Check-in</title>
+<meta name="description" content="踏遍香港群山，記錄你的山野旅程。卡通地圖 × 實時天氣 × 成就徽章。">
+<meta property="og:title" content="香港山脉打卡">
+<meta property="og:description" content="卡通地圖 × 實時天氣 × 成就徽章，記錄你的香港登山之旅。">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0d1f17">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<!-- CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1/dist/confetti.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<style>
+/* ============================================
+   DESIGN TOKENS (OKLCH)
+   ============================================ */
+:root {
+  --bg-deep:       #0d1f17;
+  --bg-surface:    #152a1f;
+  --bg-elevated:   #1c3528;
+  --ink-primary:   #e8ece9;
+  --ink-secondary: #9ab5a4;
+  --ink-muted:     #5c7a66;
+  --accent-jade:   #2d8a56;
+  --accent-sky:    #5b9bd5;
+  --accent-gold:   #c4a43e;
+  --ocean:         #a8d8ea;
+  --land:          #c8e6c9;
+  --sand:          #ffe0b2;
+  --radius-card:   16px;
+  --radius-btn:    999px;
+  --radius-modal:  24px;
+  --font-sans:     'Geist', system-ui, -apple-system, sans-serif;
+  --font-cn:       'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  --font-mono:     'Geist Mono', 'SF Mono', monospace;
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ===== LAYOUT ===== */
+  --map-height: 70vh;
+}
+
+/* ============================================
+   RESET & BASE
+   ============================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-deep);
+  color: var(--ink-primary);
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* ============================================
+   TYPOGRAPHY
+   ============================================ */
+h1, h2, h3 { font-family: var(--font-cn); line-height: 1.2; }
+h1 { font-size: 1.75rem; font-weight: 700; }
+h2 { font-size: 1.25rem; font-weight: 600; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ============================================
+   AUTH VIEWS
+   ============================================ */
+.auth-container {
+  display: none;
+  position: fixed; inset: 0; z-index: 1000;
+  flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg-deep);
+}
+.auth-container.active { display: flex; }
+
+.auth-card {
+  width: 90%; max-width: 400px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-card);
+  padding: 2rem 1.5rem;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.auth-card h1 { text-align: center; margin-bottom: 0.25rem; font-size: 1.5rem; }
+.auth-card .subtitle { text-align: center; color: var(--ink-secondary); font-size: 0.875rem; margin-bottom: 1.5rem; }
+
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; font-size: 0.8125rem; color: var(--ink-secondary); margin-bottom: 0.375rem; font-weight: 500; }
+.form-group input {
+  width: 100%; padding: 0.75rem 1rem;
+  background: var(--bg-deep);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  color: var(--ink-primary);
+  font-size: 0.9375rem;
+  font-family: var(--font-sans);
+  transition: border-color 0.2s;
+  outline: none;
+}
+.form-group input:focus { border-color: var(--accent-jade); }
+.form-group input::placeholder { color: var(--ink-muted); }
+
+.avatar-pick {
+  display: flex; gap: 0.75rem; margin-top: 0.25rem;
+}
+.avatar-btn {
+  flex: 1; padding: 0.75rem;
+  background: var(--bg-deep);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  color: var(--ink-primary);
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+.avatar-btn:hover { border-color: var(--ink-muted); }
+.avatar-btn.selected { border-color: var(--accent-jade); background: rgba(45,138,86,0.15); }
+
+.btn {
+  width: 100%; padding: 0.75rem;
+  border: none; border-radius: var(--radius-btn);
+  font-size: 0.9375rem; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-sans);
+}
+.btn-primary { background: var(--accent-jade); color: #fff; }
+.btn-primary:hover { background: #247148; }
+.btn-primary:active { transform: scale(0.98); }
+
+.auth-error {
+  color: #e57373; font-size: 0.8125rem; text-align: center;
+  margin-top: 0.75rem; min-height: 1.25rem;
+}
+
+.auth-switch {
+  text-align: center; margin-top: 1rem; font-size: 0.875rem; color: var(--ink-secondary);
+}
+.auth-switch a { color: var(--accent-jade); cursor: pointer; text-decoration: none; }
+.auth-switch a:hover { text-decoration: underline; }
+
+/* ============================================
+   TOP NAVIGATION
+   ============================================ */
+.top-nav {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(180deg, rgba(13,31,23,0.95) 60%, rgba(13,31,23,0) 100%);
+  justify-content: space-between; align-items: center;
+}
+.top-nav.active { display: flex; }
+
+.nav-user {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.875rem; color: var(--ink-secondary);
+}
+.nav-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--bg-elevated); display: flex; align-items: center; justify-content: center; font-size: 0.875rem; }
+.nav-btn {
+  padding: 0.375rem 0.75rem;
+  background: transparent; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--radius-btn);
+  color: var(--ink-secondary); font-size: 0.75rem; cursor: pointer;
+  transition: all 0.2s;
+}
+.nav-btn:hover { border-color: rgba(255,255,255,0.3); color: var(--ink-primary); }
+
+/* ============================================
+   MAIN APP
+   ============================================ */
+.app-main {
+  display: none; flex-direction: column; min-height: 100dvh;
+}
+.app-main.active { display: flex; }
+
+/* ============================================
+   MAP SECTION
+   ============================================ */
+.map-section {
+  position: relative;
+  width: 100%; height: var(--map-height);
+  overflow: hidden;
+  background: linear-gradient(180deg, #87CEEB 0%, #a8d8ea 40%, #b8d4e0 70%, var(--ocean) 100%);
+}
+
+.map-section svg { width: 100%; height: 100%; display: block; }
+
+/* Weather overlay */
+.weather-layer {
+  position: absolute; inset: 0; pointer-events: none; z-index: 2; overflow: hidden;
+}
+
+/* Sun */
+.weather-sun {
+  position: absolute; top: 10%; right: 15%;
+  width: 60px; height: 60px;
+  background: radial-gradient(circle, #ffe082 30%, #ffcc02 60%, transparent 70%);
+  border-radius: 50%;
+  box-shadow: 0 0 40px rgba(255,204,2,0.5), 0 0 80px rgba(255,204,2,0.2);
+  animation: sunPulse 3s ease-in-out infinite;
+}
+@keyframes sunPulse {
+  0%, 100% { box-shadow: 0 0 40px rgba(255,204,2,0.5), 0 0 80px rgba(255,204,2,0.2); }
+  50% { box-shadow: 0 0 60px rgba(255,204,2,0.7), 0 0 100px rgba(255,204,2,0.3); }
+}
+
+/* Clouds */
+.weather-cloud {
+  position: absolute;
+  background: rgba(255,255,255,0.85);
+  border-radius: 50%;
+  animation: cloudDrift linear infinite;
+}
+.weather-cloud::before,
+.weather-cloud::after {
+  content: ''; position: absolute;
+  background: inherit; border-radius: 50%;
+}
+@keyframes cloudDrift {
+  0% { transform: translateX(120vw); }
+  100% { transform: translateX(-150%); }
+}
+
+/* Rain */
+.weather-rain {
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent, transparent 2px,
+    rgba(100,160,210,0.3) 3px, transparent 4px
+  );
+  animation: rainFall 0.5s linear infinite;
+  opacity: 0;
+  transition: opacity 2s;
+}
+.weather-rain.active { opacity: 1; }
+@keyframes rainFall {
+  0% { transform: translateY(-10px); }
+  100% { transform: translateY(10px); }
+}
+
+/* Heavy rain */
+.weather-heavy-rain {
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    15deg,
+    transparent, transparent 1px,
+    rgba(80,130,180,0.5) 2px, transparent 2px
+  );
+  animation: heavyRainFall 0.35s linear infinite;
+  opacity: 0;
+  transition: opacity 2s;
+}
+.weather-heavy-rain.active { opacity: 1; }
+@keyframes heavyRainFall {
+  0% { transform: translateY(-15px) translateX(-5px); }
+  100% { transform: translateY(15px) translateX(5px); }
+}
+
+/* Fog */
+.weather-fog {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(255,255,255,0.25) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 50%, rgba(255,255,255,0.2) 0%, transparent 60%);
+  animation: fogDrift 8s ease-in-out infinite;
+  opacity: 0;
+  transition: opacity 2s;
+}
+.weather-fog.active { opacity: 1; }
+@keyframes fogDrift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(20px); }
+}
+
+/* Lightning */
+.weather-lightning {
+  position: absolute; inset: 0; background: rgba(255,255,255,0);
+  opacity: 0; transition: opacity 0.05s; pointer-events: none;
+}
+.weather-lightning.flash { opacity: 0.6; background: rgba(255,255,255,1); }
+
+/* Dark cloud overlay for rain/thunderstorm */
+.weather-dark-clouds {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(60,70,80,0.5) 0%, rgba(80,90,100,0.4) 50%, transparent 100%);
+  opacity: 0; transition: opacity 2s;
+}
+.weather-dark-clouds.active { opacity: 1; }
+
+/* Temperature badge */
+.weather-temp {
+  position: absolute; top: 12px; right: 12px; z-index: 5;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--ink-primary); font-size: 0.8125rem; font-weight: 600;
+  padding: 0.375rem 0.75rem; border-radius: var(--radius-btn);
+  pointer-events: none;
+}
+
+/* ============================================
+   MAP SVG ELEMENTS
+   ============================================ */
+.mountain-group { cursor: pointer; transition: transform 0.2s var(--ease-out-quint); }
+.mountain-group:hover { transform: scale(1.08); }
+.mountain-group.checked .mountain-peak { fill: var(--accent-jade); }
+.mountain-group.checked .mountain-body { fill: #4caf50; }
+.mountain-group .flag { opacity: 0; transition: opacity 0.3s; }
+.mountain-group.checked .flag { opacity: 1; }
+
+.mountain-label {
+  font-family: var(--font-cn); font-size: 11px; fill: var(--ink-primary);
+  text-anchor: middle; pointer-events: none;
+}
+.mountain-label-en {
+  font-family: var(--font-sans); font-size: 9px; fill: var(--ink-secondary);
+  text-anchor: middle; pointer-events: none;
+}
+
+/* Hiker */
+.hiker-group { transition: transform 0.6s var(--ease-out-quint); }
+.hiker-body { animation: hikerBob 0.6s ease-in-out infinite; }
+.hiker-left-leg { animation: hikerLeftLeg 0.6s ease-in-out infinite; transform-origin: 50% 75%; }
+.hiker-right-leg { animation: hikerRightLeg 0.6s ease-in-out infinite; transform-origin: 50% 75%; }
+.hiker-pole { animation: hikerPole 0.6s ease-in-out infinite; transform-origin: 80% 50%; }
+.hiker-backpack { animation: hikerBackpack 0.6s ease-in-out infinite 0.1s; }
+
+@keyframes hikerBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes hikerLeftLeg {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+@keyframes hikerRightLeg {
+  0%, 100% { transform: rotate(6deg); }
+  50% { transform: rotate(-6deg); }
+}
+@keyframes hikerPole {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+@keyframes hikerBackpack {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.5px); }
+}
+
+/* Fast walk in thunderstorm */
+.hiker-group.fast .hiker-body { animation-duration: 0.3s; }
+.hiker-group.fast .hiker-left-leg { animation-duration: 0.3s; }
+.hiker-group.fast .hiker-right-leg { animation-duration: 0.3s; }
+.hiker-group.fast .hiker-pole { animation-duration: 0.3s; }
+.hiker-group.fast .hiker-backpack { animation-duration: 0.3s; }
+
+/* Hiker umbrella */
+.hiker-umbrella { opacity: 0; transition: opacity 0.3s; }
+.hiker-group.raining .hiker-umbrella { opacity: 1; }
+
+/* Hiker flashlight for fog */
+.hiker-flashlight { opacity: 0; transition: opacity 0.3s; }
+.hiker-group.foggy .hiker-flashlight { opacity: 0.6; }
+
+/* ============================================
+   STATS PANEL
+   ============================================ */
+.stats-panel {
+  display: flex; gap: 0; margin: 0 1rem;
+  background: var(--bg-surface);
+  border-radius: var(--radius-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+
+.stat-item {
+  flex: 1; text-align: center; padding: 1rem 0.5rem;
+  position: relative;
+}
+.stat-item + .stat-item::before {
+  content: ''; position: absolute; left: 0; top: 25%; bottom: 25%;
+  width: 1px; background: rgba(255,255,255,0.06);
+}
+.stat-value { font-family: var(--font-mono); font-size: 1.125rem; font-weight: 700; color: var(--accent-jade); }
+.stat-label { font-size: 0.6875rem; color: var(--ink-muted); margin-top: 0.25rem; }
+
+/* ============================================
+   MOUNTAIN DETAIL MODAL
+   ============================================ */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  align-items: center; justify-content: center;
+}
+.modal-overlay.active { display: flex; }
+
+.modal-card {
+  width: 90%; max-width: 380px; max-height: 85dvh; overflow-y: auto;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-modal);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 1.5rem;
+  animation: modalIn 0.3s var(--ease-out-quint);
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-close {
+  position: absolute; top: 0.75rem; right: 0.75rem;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,0.06); border: none; color: var(--ink-secondary);
+  font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+}
+.modal-close:hover { background: rgba(255,255,255,0.12); }
+
+.modal-mountain-icon { font-size: 3rem; text-align: center; margin-bottom: 0.5rem; }
+.modal-mountain-name { font-family: var(--font-cn); font-size: 1.375rem; font-weight: 700; text-align: center; }
+.modal-mountain-name-en { font-family: var(--font-sans); font-size: 0.875rem; color: var(--ink-secondary); text-align: center; margin-bottom: 1rem; }
+
+.modal-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem; }
+.modal-stat { text-align: center; padding: 0.5rem; background: var(--bg-surface); border-radius: 10px; }
+.modal-stat-value { font-family: var(--font-mono); font-size: 0.9375rem; font-weight: 600; }
+.modal-stat-label { font-size: 0.6875rem; color: var(--ink-muted); }
+
+.modal-desc { font-size: 0.875rem; color: var(--ink-secondary); line-height: 1.6; margin-bottom: 1.25rem; text-align: center; }
+
+.modal-actions { display: flex; flex-direction: column; gap: 0.5rem; }
+.btn-checkin { background: var(--accent-jade); color: #fff; font-size: 1rem; padding: 0.875rem; }
+.btn-checkin.checked { background: var(--bg-surface); color: var(--accent-jade); border: 1px solid var(--accent-jade); }
+.btn-cert { background: transparent; color: var(--accent-sky); border: 1px solid rgba(91,155,213,0.3); }
+.btn-cert:hover { border-color: var(--accent-sky); }
+
+/* ============================================
+   CERTIFICATE MODAL
+   ============================================ */
+.cert-overlay {
+  display: none; position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  align-items: center; justify-content: center; flex-direction: column;
+}
+.cert-overlay.active { display: flex; }
+
+.cert-card {
+  width: 300px; height: 400px;
+  background: #0f1110;
+  border-radius: 8px;
+  position: relative; overflow: hidden;
+  color: var(--ink-primary);
+  flex-shrink: 0;
+}
+.cert-accent { position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--accent-jade); }
+.cert-content { padding: 2rem 1.75rem 1.75rem 2.25rem; height: 100%; display: flex; flex-direction: column; }
+.cert-header { font-family: var(--font-cn); font-size: 0.75rem; color: var(--ink-muted); letter-spacing: 0.15em; text-transform: uppercase; }
+.cert-mountain { font-family: var(--font-cn); font-size: 1.75rem; font-weight: 700; margin-top: 0.5rem; line-height: 1.1; }
+.cert-mountain-en { font-family: var(--font-sans); font-size: 0.875rem; color: var(--ink-secondary); margin-bottom: 0.75rem; }
+.cert-elevation { font-family: var(--font-mono); font-size: 3rem; font-weight: 700; color: var(--accent-jade); line-height: 1; }
+.cert-elevation-unit { font-size: 1rem; color: var(--ink-secondary); }
+.cert-details { margin-top: auto; font-size: 0.75rem; color: var(--ink-muted); line-height: 1.8; }
+.cert-details span { color: var(--ink-secondary); }
+.cert-number { font-family: var(--font-mono); font-size: 0.625rem; color: var(--ink-muted); margin-top: 0.5rem; }
+.cert-user { font-size: 0.875rem; color: var(--ink-primary); font-weight: 600; margin-top: 0.25rem; }
+.cert-brand { font-size: 0.625rem; color: var(--ink-muted); margin-top: 0.75rem; text-align: right; letter-spacing: 0.05em; }
+
+.cert-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+.cert-actions .btn { width: auto; padding: 0.625rem 1.25rem; font-size: 0.8125rem; }
+
+/* ============================================
+   BADGE TOAST
+   ============================================ */
+.toast-container {
+  position: fixed; top: 1rem; right: 1rem; z-index: 400;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  pointer-events: none;
+}
+.badge-toast {
+  background: var(--bg-elevated); border: 1px solid var(--accent-gold);
+  border-radius: var(--radius-card);
+  padding: 1rem; display: flex; align-items: center; gap: 0.75rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  animation: toastIn 0.4s var(--ease-out-quint);
+  pointer-events: auto;
+  position: relative; overflow: hidden;
+}
+.badge-toast::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(196,164,62,0.15) 50%, transparent 100%);
+  animation: shimmer 2s ease-in-out infinite;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.badge-icon { font-size: 1.5rem; flex-shrink: 0; }
+.badge-info { font-size: 0.8125rem; }
+.badge-name { font-weight: 700; color: var(--accent-gold); }
+
+/* ============================================
+   BADGE GRID (in achievements area)
+   ============================================ */
+.achievements-section { padding: 1.5rem 1rem 2rem; }
+.achievements-section h2 { margin-bottom: 0.75rem; }
+.badge-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem;
+}
+.badge-item {
+  aspect-ratio: 1;
+  background: var(--bg-surface); border-radius: var(--radius-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 0.5rem;
+  transition: all 0.3s;
+}
+.badge-item.locked { opacity: 0.35; filter: grayscale(1); }
+.badge-item.unlocked { border-color: var(--accent-gold); }
+.badge-item .badge-emoji { font-size: 1.5rem; }
+.badge-item .badge-title { font-size: 0.625rem; color: var(--ink-secondary); margin-top: 0.25rem; line-height: 1.2; }
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 640px) {
+  :root { --map-height: 55vh; }
+  .stats-panel { margin: 0 0.75rem; border-radius: 0; }
+  .badge-grid { grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+  .modal-card { width: 94%; padding: 1.25rem; }
+  .cert-card { width: 260px; height: 347px; }
+}
+
+@media (min-width: 1024px) {
+  :root { --map-height: 75vh; }
+  .app-main { max-width: 900px; margin: 0 auto; }
+  .stats-panel { max-width: 500px; margin: 0 auto; }
+}
+
+/* ============================================
+   LOADING / EMPTY / ERROR STATES
+   ============================================ */
+.loading-spinner {
+  width: 24px; height: 24px; border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: var(--accent-jade); border-radius: 50%;
+  animation: spin 0.6s linear infinite; margin: 2rem auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================
+   REDUCED MOTION
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================
+     AUTH: LOGIN VIEW
+     ============================================ -->
+<div class="auth-container active" id="auth-login">
+  <div class="auth-card">
+    <h1>🏔️ 香港山脉打卡</h1>
+    <p class="subtitle">登錄你的登山之旅</p>
+    <div class="form-group">
+      <label>電子郵箱</label>
+      <input type="email" id="login-email" placeholder="your@email.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label>密碼</label>
+      <input type="password" id="login-password" placeholder="至少 6 位" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="btn-login">登 錄</button>
+    <p class="auth-error" id="login-error"></p>
+    <p class="auth-switch">還沒有帳號？<a id="link-to-register">立即註冊</a></p>
+  </div>
+</div>
+
+<!-- ============================================
+     AUTH: REGISTER VIEW
+     ============================================ -->
+<div class="auth-container" id="auth-register">
+  <div class="auth-card">
+    <h1>🏔️ 加入旅程</h1>
+    <p class="subtitle">創建你的登山帳號</p>
+    <div class="form-group">
+      <label>暱稱</label>
+      <input type="text" id="reg-username" placeholder="你的登山暱稱" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>電子郵箱</label>
+      <input type="email" id="reg-email" placeholder="your@email.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label>密碼</label>
+      <input type="password" id="reg-password" placeholder="至少 6 位" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label>選擇你的形象</label>
+      <div class="avatar-pick">
+        <button class="avatar-btn selected" data-gender="boy" id="pick-boy">👦 男生</button>
+        <button class="avatar-btn" data-gender="girl" id="pick-girl">👧 女生</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btn-register">註 冊</button>
+    <p class="auth-error" id="register-error"></p>
+    <p class="auth-switch">已經有帳號？<a id="link-to-login">去登錄</a></p>
+  </div>
+</div>
+
+<!-- ============================================
+     TOP NAV
+     ============================================ -->
+<nav class="top-nav" id="top-nav">
+  <div class="nav-user">
+    <div class="nav-avatar" id="nav-avatar">👦</div>
+    <span id="nav-username"></span>
+  </div>
+  <button class="nav-btn" id="btn-logout">退出</button>
+</nav>
+
+<!-- ============================================
+     MAIN APP
+     ============================================ -->
+<main class="app-main" id="app-main">
+
+  <!-- MAP -->
+  <section class="map-section" id="map-section">
+    <svg id="map-svg" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+      <!-- Generated by JS -->
+    </svg>
+    <div class="weather-layer" id="weather-layer"></div>
+    <div class="weather-temp" id="weather-temp"></div>
+  </section>
+
+  <!-- STATS -->
+  <div class="stats-panel" id="stats-panel">
+    <div class="stat-item">
+      <div class="stat-value" id="stat-peaks">0/12</div>
+      <div class="stat-label">已登頂</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="stat-elevation">0m</div>
+      <div class="stat-label">累計爬升</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="stat-highest">--</div>
+      <div class="stat-label">最高峰</div>
+    </div>
+  </div>
+
+  <!-- ACHIEVEMENTS -->
+  <section class="achievements-section">
+    <h2>🏅 登山徽章</h2>
+    <div class="badge-grid" id="badge-grid"></div>
+  </section>
+
+</main>
+
+<!-- ============================================
+     MOUNTAIN DETAIL MODAL
+     ============================================ -->
+<div class="modal-overlay" id="mountain-modal">
+  <div class="modal-card" style="position:relative;">
+    <button class="modal-close" id="modal-close">✕</button>
+    <div class="modal-mountain-icon" id="modal-icon"></div>
+    <div class="modal-mountain-name" id="modal-name"></div>
+    <div class="modal-mountain-name-en" id="modal-name-en"></div>
+    <div class="modal-stats">
+      <div class="modal-stat">
+        <div class="modal-stat-value" id="modal-elevation"></div>
+        <div class="modal-stat-label">海拔 (m)</div>
+      </div>
+      <div class="modal-stat">
+        <div class="modal-stat-value" id="modal-difficulty"></div>
+        <div class="modal-stat-label">難度</div>
+      </div>
+      <div class="modal-stat">
+        <div class="modal-stat-value" id="modal-region"></div>
+        <div class="modal-stat-label">地區</div>
+      </div>
+    </div>
+    <p class="modal-desc" id="modal-desc"></p>
+    <div class="modal-actions">
+      <button class="btn btn-checkin" id="btn-checkin">🏔️ 我要打卡</button>
+      <button class="btn btn-cert" id="btn-view-cert" style="display:none;">📜 查看證書</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     CERTIFICATE MODAL
+     ============================================ -->
+<div class="cert-overlay" id="cert-overlay">
+  <div class="cert-card" id="cert-card">
+    <div class="cert-accent"></div>
+    <div class="cert-content">
+      <div class="cert-header">登頂認證</div>
+      <div class="cert-mountain" id="cert-mountain"></div>
+      <div class="cert-mountain-en" id="cert-mountain-en"></div>
+      <div class="cert-elevation"><span id="cert-elevation-val"></span><span class="cert-elevation-unit">m</span></div>
+      <div class="cert-details">
+        打卡日期 <span id="cert-date"></span><br>
+        第 <span id="cert-rank"></span> 座登頂山峰
+      </div>
+      <div class="cert-user" id="cert-user"></div>
+      <div class="cert-number" id="cert-number"></div>
+      <div class="cert-brand">HKMOUNTAIN</div>
+    </div>
+  </div>
+  <div class="cert-actions">
+    <button class="btn btn-primary" id="btn-save-cert">💾 保存圖片</button>
+    <button class="btn btn-cert" id="btn-share-cert">📤 分享</button>
+    <button class="btn nav-btn" id="btn-close-cert">關閉</button>
+  </div>
+</div>
+
+<!-- ============================================
+     TOAST CONTAINER
+     ============================================ -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ============================================
+// CONFIG — 部署前替換為你的 Supabase 憑據
+// ============================================
+const SUPABASE_URL = 'https://rqtudoxxkwqsfihsylbw.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxdHVkb3h4a3dxc2ZpaHN5bGJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNTI2NjQsImV4cCI6MjA5NjkyODY2NH0.szAdVQwGK6d9FPPwUqA-LU5Kck5xMs15B7_Mre8jzFY';
+
+// ============================================
+// SUPABASE CLIENT
+// ============================================
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============================================
+// MOUNTAIN DATA
+// ============================================
+const MOUNTAINS = [
+  { id: 'tai-mo-shan',     nameCn: '大帽山',   nameEn: 'Tai Mo Shan',    elevation: 957, difficulty: 3, region: '新界',   lat: 22.41, lng: 114.12, desc: '香港最高峰，登頂可俯瞰整個新界及深圳。山頂有雷達站，是香港的「天空之鏡」。' },
+  { id: 'lantau-peak',     nameCn: '鳳凰山',   nameEn: 'Lantau Peak',    elevation: 934, difficulty: 4, region: '大嶼山', lat: 22.25, lng: 113.92, desc: '大嶼山最高點，日出勝地。每年無數山友凌晨摸黑登山，只為一睹鳳凰日出。' },
+  { id: 'sunset-peak',     nameCn: '大東山',   nameEn: 'Sunset Peak',    elevation: 869, difficulty: 3, region: '大嶼山', lat: 22.26, lng: 113.95, desc: '芒草季的打卡熱點，秋天滿山金黃芒草隨風搖曳，Eason 唱片封面取景地。' },
+  { id: 'ma-on-shan',      nameCn: '馬鞍山',   nameEn: 'Ma On Shan',     elevation: 702, difficulty: 3, region: '新界',   lat: 22.40, lng: 114.25, desc: '山形如馬鞍，遠眺西貢海景。路線多變，從休閒到攀爬都有選擇。' },
+  { id: 'kowloon-peak',    nameCn: '飛鵝山',   nameEn: 'Kowloon Peak',   elevation: 602, difficulty: 2, region: '九龍',   lat: 22.34, lng: 114.22, desc: '九龍半島最高點，夜間可看萬家燈火。自殺崖是打卡熱點但需注意安全。' },
+  { id: 'victoria-peak',   nameCn: '太平山',   nameEn: 'Victoria Peak',  elevation: 552, difficulty: 1, region: '香港島', lat: 22.28, lng: 114.15, desc: '香港地標，山頂凌霄閣舉世聞名。從盧吉道步行上山是最經典的港島路線。' },
+  { id: 'lion-rock',       nameCn: '獅子山',   nameEn: 'Lion Rock',      elevation: 495, difficulty: 2, region: '九龍',   lat: 22.35, lng: 114.19, desc: '香港精神象徵，山形如臥獅。登上獅頭俯瞰九龍，是每個香港人的儀式。' },
+  { id: 'sharp-peak',      nameCn: '蚺蛇尖',   nameEn: 'Sharp Peak',     elevation: 468, difficulty: 5, region: '新界',   lat: 22.43, lng: 114.37, desc: '香港三尖之首，山形尖削極具挑戰。360° 無敵海景，登頂成就感爆棚。' },
+  { id: 'pat-sin-leng',    nameCn: '八仙嶺',   nameEn: 'Pat Sin Leng',   elevation: 550, difficulty: 4, region: '新界',   lat: 22.49, lng: 114.22, desc: '八個山峰連綿如八仙過海，遠眺船灣淡水湖。路線長但風景壯闊。' },
+  { id: 'dragons-back',    nameCn: '龍脊',     nameEn: "Dragon's Back",  elevation: 284, difficulty: 2, region: '香港島', lat: 22.24, lng: 114.24, desc: '曾被《時代周刊》評為亞洲最佳市區遠足徑。山脊如龍背蜿蜒，石澳海景盡收眼底。' },
+  { id: 'lamma-trail',     nameCn: '南丫島',   nameEn: 'Lamma Trail',    elevation: 353, difficulty: 1, region: '離島',   lat: 22.20, lng: 114.12, desc: '離島風情，榕樹灣走到索罟灣。海鮮大餐是登頂後的最佳獎勵！' },
+  { id: 'maclehose-s4',    nameCn: '麥徑四段', nameEn: 'MacLehose T4',   elevation: 550, difficulty: 4, region: '新界',   lat: 22.38, lng: 114.27, desc: '麥理浩徑第四段，從水浪窩到基維爾營地。途經馬鞍山，山海景色壯麗。' },
+];
+
+// ============================================
+// ACHIEVEMENT DEFINITIONS
+// ============================================
+const ACHIEVEMENTS = [
+  { id: 'first-peak',     name: '初登山者',   icon: '⛰️', cond: (c) => c.length >= 1 },
+  { id: 'five-peaks',     name: '山野行者',   icon: '🥾', cond: (c) => c.length >= 5 },
+  { id: 'all-hk-island',  name: '港島之王',   icon: '🏝️', cond: (c) => hasAllRegion(c, '香港島') },
+  { id: 'all-kowloon',    name: '九龍之主',   icon: '🦁', cond: (c) => hasAllRegion(c, '九龍') },
+  { id: 'highest-peak',   name: '巔峰之巔',   icon: '👑', cond: (c) => c.includes('tai-mo-shan') },
+  { id: 'sharp-peak-badge', name: '險峰征服者', icon: '🗻', cond: (c) => c.includes('sharp-peak') },
+  { id: 'elevation-3000', name: '3000米俱樂部', icon: '📈', cond: (c, t) => t >= 3000 },
+  { id: 'all-12',         name: '滿山之王',   icon: '🏆', cond: (c) => c.length >= 12 },
+];
+
+const REGION_MOUNTAINS = {
+  '香港島': ['victoria-peak', 'dragons-back'],
+  '九龍': ['kowloon-peak', 'lion-rock'],
+};
+
+function hasAllRegion(checkins, region) {
+  const required = REGION_MOUNTAINS[region];
+  if (!required) return false;
+  return required.every(id => checkins.includes(id));
+}
+
+// ============================================
+// GLOBAL STATE
+// ============================================
+let currentUser = null;
+let currentProfile = null;
+let checkins = [];
+let currentMountain = null;
+let avatarGender = 'boy';
+
+// ============================================
+// DOM REFS
+// ============================================
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+
+// ============================================
+// AUTH
+// ============================================
+const authLogin = $('#auth-login');
+const authRegister = $('#auth-register');
+const appMain = $('#app-main');
+const topNav = $('#top-nav');
+
+function showView(view) {
+  authLogin.classList.toggle('active', view === 'login');
+  authRegister.classList.toggle('active', view === 'register');
+  appMain.classList.toggle('active', view === 'app');
+  topNav.classList.toggle('active', view === 'app');
+}
+
+// Login
+$('#btn-login').addEventListener('click', async () => {
+  const email = $('#login-email').value.trim();
+  const password = $('#login-password').value;
+  if (!email || !password) {
+    $('#login-error').textContent = '請填寫所有欄位';
+    return;
+  }
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    $('#login-error').textContent = error.message === 'Invalid login credentials'
+      ? '郵箱或密碼錯誤' : error.message;
+  }
+});
+
+// Register
+$('#btn-register').addEventListener('click', async () => {
+  const username = $('#reg-username').value.trim();
+  const email = $('#reg-email').value.trim();
+  const password = $('#reg-password').value;
+  if (!username || !email || !password) {
+    $('#register-error').textContent = '請填寫所有欄位';
+    return;
+  }
+  if (password.length < 6) {
+    $('#register-error').textContent = '密碼至少需要 6 位';
+    return;
+  }
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) {
+    $('#register-error').textContent = error.message.includes('already registered')
+      ? '此郵箱已被註冊' : error.message;
+    return;
+  }
+  if (data.user) {
+    await supabase.from('profiles').insert({
+      id: data.user.id,
+      username,
+      avatar_gender: avatarGender
+    });
+  }
+});
+
+// Avatar picker
+$$('.avatar-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.avatar-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    avatarGender = btn.dataset.gender;
+  });
+});
+
+// View switching
+$('#link-to-register').addEventListener('click', () => showView('register'));
+$('#link-to-login').addEventListener('click', () => showView('login'));
+
+// Logout
+$('#btn-logout').addEventListener('click', async () => {
+  await supabase.auth.signOut();
+});
+
+// Auth state listener
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if (session?.user) {
+    currentUser = session.user;
+    const { data: profile } = await supabase.from('profiles')
+      .select('*').eq('id', currentUser.id).single();
+    currentProfile = profile;
+    avatarGender = profile?.avatar_gender || 'boy';
+    await loadCheckins();
+    showView('app');
+    updateNav();
+    renderMap();
+    renderBadges();
+    updateStats();
+    fetchWeather();
+  } else {
+    currentUser = null;
+    currentProfile = null;
+    checkins = [];
+    showView('login');
+  }
+});
+
+function updateNav() {
+  $('#nav-avatar').textContent = avatarGender === 'girl' ? '👧' : '👦';
+  $('#nav-username').textContent = currentProfile?.username || '';
+}
+
+// ============================================
+// DATA LAYER
+// ============================================
+async function loadCheckins() {
+  if (!currentUser) return;
+  const { data } = await supabase.from('checkins')
+    .select('mountain_id, checked_at')
+    .eq('user_id', currentUser.id);
+  checkins = data || [];
+}
+
+async function doCheckin(mountainId) {
+  if (!currentUser) return false;
+  const { error } = await supabase.from('checkins').insert({
+    user_id: currentUser.id,
+    mountain_id: mountainId
+  });
+  if (error) {
+    if (error.code === '23505') return false; // duplicate
+    console.error('Checkin error:', error);
+    return false;
+  }
+  await loadCheckins();
+  return true;
+}
+
+async function undoCheckin(mountainId) {
+  if (!currentUser) return false;
+  await supabase.from('checkins')
+    .delete()
+    .eq('user_id', currentUser.id)
+    .eq('mountain_id', mountainId);
+  await loadCheckins();
+  return true;
+}
+
+function isChecked(mountainId) {
+  return checkins.some(c => c.mountain_id === mountainId);
+}
+
+function getCheckinDate(mountainId) {
+  const c = checkins.find(c => c.mountain_id === mountainId);
+  return c ? new Date(c.checked_at) : null;
+}
+
+// ============================================
+// SVG MAP RENDERING
+// ============================================
+function geoToSvg(lat, lng) {
+  const x = (lng - 113.82) / 0.60 * 800;
+  const y = (22.55 - lat) / 0.40 * 600;
+  return { x, y };
+}
+
+function renderMap() {
+  const svg = $('#map-svg');
+  const checkedIds = checkins.map(c => c.mountain_id);
+
+  let html = '';
+
+  // Ocean background
+  html += `<rect x="0" y="0" width="800" height="600" fill="#a8d8ea" rx="0"/>`;
+
+  // Ocean waves (decorative)
+  html += `<path d="M0 480 Q50 470 100 480 Q150 490 200 480 Q250 470 300 480 Q350 490 400 480 Q450 470 500 480 Q550 490 600 480 Q650 470 700 480 Q750 490 800 480 L800 520 Q750 530 700 520 Q650 510 600 520 Q550 530 500 520 Q450 510 400 520 Q350 530 300 520 Q250 510 200 520 Q150 530 100 520 Q50 510 0 520 Z" fill="#8ec8de" opacity="0.5"/>`;
+
+  // Simplified landmass: New Territories + Kowloon
+  html += `<path d="M80 200 Q150 160 250 170 Q350 140 420 150 Q500 130 580 150 Q650 140 720 170
+    Q750 190 730 230 Q700 280 650 310 Q600 340 520 340 Q450 350 380 340
+    Q300 350 240 330 Q180 320 120 300 Q80 280 80 200 Z"
+    fill="${LAND_COLOR}" stroke="${LAND_STROKE}" stroke-width="2"/>`;
+
+  // Lantau Island
+  html += `<path d="M30 380 Q60 340 100 370 Q140 380 120 420 Q90 450 50 440 Q20 430 30 380 Z"
+    fill="${LAND_COLOR}" stroke="${LAND_STROKE}" stroke-width="2"/>`;
+
+  // Hong Kong Island
+  html += `<path d="M420 380 Q460 360 500 370 Q540 380 530 420 Q500 450 460 450 Q430 440 420 380 Z"
+    fill="${LAND_COLOR}" stroke="${LAND_STROKE}" stroke-width="2"/>`;
+
+  // Lamma Island
+  html += `<ellipse cx="440" cy="500" rx="25" ry="18" fill="${SAND_COLOR}" stroke="${LAND_STROKE}" stroke-width="1.5"/>`;
+
+  // Cheung Chau
+  html += `<ellipse cx="130" cy="490" rx="12" ry="8" fill="${SAND_COLOR}" stroke="${LAND_STROKE}" stroke-width="1.5"/>`;
+
+  // Peng Chau
+  html += `<ellipse cx="360" cy="460" rx="8" ry="5" fill="${SAND_COLOR}" stroke="${LAND_STROKE}" stroke-width="1.5"/>`;
+
+  // Mountains
+  MOUNTAINS.forEach((m, i) => {
+    const { x, y } = geoToSvg(m.lat, m.lng);
+    const checked = checkedIds.includes(m.id);
+    const peakColor = checked ? '#2d8a56' : '#8d6e63';
+    const bodyColor = checked ? '#4caf50' : '#9e9e9e';
+
+    html += `<g class="mountain-group ${checked ? 'checked' : ''}" data-mountain="${m.id}" id="mt-${m.id}" transform="translate(${x - 22}, ${y - 40})">`;
+    // Mountain body
+    html += `<polygon class="mountain-body" points="22,8 6,45 38,45" fill="${bodyColor}" rx="2"/>`;
+    // Snow cap (Tai Mo Shan)
+    if (m.id === 'tai-mo-shan') {
+      html += `<polygon points="17,16 22,8 27,16" fill="white" opacity="0.7"/>`;
+    }
+    // Peak highlight
+    html += `<polygon class="mountain-peak" points="17,16 22,8 27,16" fill="${peakColor}"/>`;
+    // Trees
+    html += `<circle cx="10" cy="40" r="5" fill="#388e3c" opacity="0.6"/>`;
+    html += `<circle cx="34" cy="42" r="4" fill="#388e3c" opacity="0.5"/>`;
+    // Flag (shown when checked)
+    html += `<g class="flag"><line x1="22" y1="8" x2="22" y2="-8" stroke="#c4a43e" stroke-width="1.5"/><polygon points="22,-8 30,-5 22,-2" fill="#c4a43e"/></g>`;
+    html += `</g>`;
+
+    // Label
+    html += `<text class="mountain-label" x="${x}" y="${y + 18}">${m.nameCn}</text>`;
+    html += `<text class="mountain-label-en" x="${x}" y="${y + 30}">${m.elevation}m</text>`;
+  });
+
+  // Hiker character
+  html += renderHiker();
+
+  svg.innerHTML = html;
+
+  // Attach click handlers to mountain groups
+  svg.querySelectorAll('.mountain-group').forEach(g => {
+    g.addEventListener('click', () => openMountainModal(g.dataset.mountain));
+  });
+}
+
+function renderHiker() {
+  const hx = 390, hy = 530; // bottom center of map
+  const isGirl = avatarGender === 'girl';
+
+  let svg = `<g class="hiker-group" id="hiker-group" transform="translate(${hx}, ${hy})">`;
+
+  // Umbrella (hidden by default, shown in rain)
+  svg += `<g class="hiker-umbrella">`;
+  svg += `<line x1="0" y1="-55" x2="0" y2="-35" stroke="#555" stroke-width="1.5"/>`;
+  svg += `<path d="M-20,-40 Q-10,-55 0,-55 Q10,-55 20,-40" fill="#ff7043" stroke="#e64a19" stroke-width="1"/>`;
+  svg += `</g>`;
+
+  // Flashlight glow (hidden by default, shown in fog)
+  svg += `<circle class="hiker-flashlight" cx="12" cy="-20" r="25" fill="rgba(255,255,200,0.3)"/>`;
+
+  // Backpack
+  svg += `<g class="hiker-backpack">`;
+  svg += `<rect x="-10" y="-32" width="18" height="20" rx="4" fill="#5d4037"/>`;
+  svg += `<rect x="-8" y="-30" width="14" height="6" rx="2" fill="#795548"/>`;
+  svg += `</g>`;
+
+  // Body
+  svg += `<g class="hiker-body">`;
+  // Torso
+  svg += `<rect x="-6" y="-20" width="12" height="18" rx="3" fill="${isGirl ? '#e91e63' : '#1565c0'}"/>`;
+  // Head
+  svg += `<circle cx="0" cy="-26" r="8" fill="#ffccbc"/>`;
+  // Hat
+  svg += `<ellipse cx="0" cy="-32" rx="12" ry="3" fill="#795548"/>`;
+  svg += `<rect x="-6" y="-37" width="12" height="5" rx="3" fill="#795548"/>`;
+  // Hair
+  if (isGirl) {
+    svg += `<path d="M-8,-30 Q-14,-28 -12,-22" stroke="#333" stroke-width="2" fill="none"/>`;
+    svg += `<path d="M8,-30 Q14,-28 12,-22" stroke="#333" stroke-width="2" fill="none"/>`;
+  }
+  // Face (simple smile)
+  svg += `<circle cx="-3" cy="-27" r="1" fill="#333"/>`;
+  svg += `<circle cx="3" cy="-27" r="1" fill="#333"/>`;
+  svg += `<path d="M-3,-23 Q0,-21 3,-23" stroke="#333" stroke-width="0.8" fill="none"/>`;
+  svg += `</g>`;
+
+  // Left leg
+  svg += `<g class="hiker-left-leg">`;
+  svg += `<rect x="-5" y="-2" width="5" height="14" rx="2" fill="#616161"/>`;
+  svg += `<rect x="-6" y="10" width="7" height="4" rx="2" fill="#424242"/>`;
+  svg += `</g>`;
+
+  // Right leg
+  svg += `<g class="hiker-right-leg">`;
+  svg += `<rect x="0" y="-2" width="5" height="14" rx="2" fill="#757575"/>`;
+  svg += `<rect x="-1" y="10" width="7" height="4" rx="2" fill="#424242"/>`;
+  svg += `</g>`;
+
+  // Hiking pole
+  svg += `<g class="hiker-pole">`;
+  svg += `<line x1="12" y1="-15" x2="18" y2="12" stroke="#888" stroke-width="1.5"/>`;
+  svg += `<circle cx="18" cy="13" r="1.5" fill="#555"/>`;
+  svg += `</g>`;
+
+  svg += `</g>`;
+  return svg;
+}
+
+// ============================================
+// MOUNTAIN DETAIL MODAL
+// ============================================
+function openMountainModal(mountainId) {
+  const m = MOUNTAINS.find(mt => mt.id === mountainId);
+  if (!m) return;
+  currentMountain = m;
+  const checked = isChecked(m.id);
+
+  $('#modal-icon').textContent = '🏔️';
+  $('#modal-name').textContent = m.nameCn;
+  $('#modal-name-en').textContent = m.nameEn;
+  $('#modal-elevation').textContent = m.elevation;
+  $('#modal-difficulty').textContent = '★'.repeat(m.difficulty) + '☆'.repeat(5 - m.difficulty);
+  $('#modal-region').textContent = m.region;
+  $('#modal-desc').textContent = m.desc;
+
+  const btnCheckin = $('#btn-checkin');
+  const btnCert = $('#btn-view-cert');
+
+  if (checked) {
+    const date = getCheckinDate(m.id);
+    btnCheckin.textContent = `✅ 已打卡 ${formatDate(date)}`;
+    btnCheckin.className = 'btn btn-checkin checked';
+    btnCheckin.onclick = null;
+    btnCert.style.display = 'block';
+    btnCert.onclick = () => openCertificate(m);
+  } else {
+    btnCheckin.textContent = '🏔️ 我要打卡';
+    btnCheckin.className = 'btn btn-checkin';
+    btnCheckin.onclick = () => handleCheckin(m);
+    btnCert.style.display = 'none';
+  }
+
+  $('#mountain-modal').classList.add('active');
+}
+
+$('#modal-close').addEventListener('click', () => {
+  $('#mountain-modal').classList.remove('active');
+});
+$('#mountain-modal').addEventListener('click', (e) => {
+  if (e.target === $('#mountain-modal')) $('#mountain-modal').classList.remove('active');
+});
+
+// ============================================
+// CHECKIN FLOW
+// ============================================
+async function handleCheckin(mountain) {
+  const btn = $('#btn-checkin');
+  btn.textContent = '打卡中...';
+  btn.disabled = true;
+
+  const success = await doCheckin(mountain.id);
+  if (!success) {
+    btn.textContent = '🏔️ 我要打卡';
+    btn.disabled = false;
+    return;
+  }
+
+  // Celebration sequence
+  celebrateCheckin(mountain);
+
+  // Update UI
+  renderMap();
+  updateStats();
+  checkAchievements();
+  $('#mountain-modal').classList.remove('active');
+
+  // Open certificate after delay
+  setTimeout(() => openCertificate(mountain), 2000);
+}
+
+function celebrateCheckin(mountain) {
+  // 1. Confetti from mountain position
+  if (typeof confetti !== 'undefined') {
+    const colors = ['#2d8a56', '#5b9bd5', '#c4a43e', '#e8ece9'];
+    confetti({
+      particleCount: 120,
+      spread: 70,
+      origin: { x: 0.5, y: 0.4 },
+      colors,
+    });
+    setTimeout(() => {
+      confetti({ particleCount: 60, spread: 50, origin: { x: 0.5, y: 0.4 }, colors });
+    }, 300);
+  }
+
+  // 2. Animate the mountain on the map
+  const mtGroup = document.getElementById(`mt-${mountain.id}`);
+  if (mtGroup && typeof anime !== 'undefined') {
+    anime({
+      targets: mtGroup,
+      scale: [1, 1.3, 1],
+      duration: 600,
+      easing: 'easeOutElastic(1, .5)',
+    });
+  }
+
+  // 3. Hiker jumps
+  const hiker = document.getElementById('hiker-group');
+  if (hiker && typeof anime !== 'undefined') {
+    anime({
+      targets: hiker,
+      translateY: [-10, 0],
+      duration: 400,
+      easing: 'easeOutQuad',
+    });
+  }
+}
+
+// ============================================
+// CERTIFICATE
+// ============================================
+function openCertificate(mountain) {
+  const rank = checkins.filter(c => c.mountain_id === mountain.id).length > 0
+    ? checkins.findIndex(c => c.mountain_id === mountain.id) + 1
+    : checkins.length;
+  const date = getCheckinDate(mountain.id) || new Date();
+  const certNum = `HK-M-${date.getFullYear()}-${String(rank).padStart(3, '0')}`;
+
+  $('#cert-mountain').textContent = mountain.nameCn;
+  $('#cert-mountain-en').textContent = mountain.nameEn;
+  $('#cert-elevation-val').textContent = mountain.elevation;
+  $('#cert-date').textContent = formatDate(date);
+  $('#cert-rank').textContent = rank;
+  $('#cert-user').textContent = currentProfile?.username || '';
+  $('#cert-number').textContent = certNum;
+
+  $('#cert-overlay').classList.add('active');
+
+  // Animate in
+  const card = $('#cert-card');
+  if (typeof anime !== 'undefined') {
+    anime({
+      targets: card,
+      translateY: [40, 0],
+      opacity: [0, 1],
+      duration: 500,
+      easing: 'easeOutQuint',
+    });
+  }
+}
+
+$('#btn-close-cert').addEventListener('click', () => {
+  $('#cert-overlay').classList.remove('active');
+});
+
+$('#btn-save-cert').addEventListener('click', async () => {
+  const card = $('#cert-card');
+  try {
+    const canvas = await html2canvas(card, { scale: 3, backgroundColor: '#0f1110' });
+    const link = document.createElement('a');
+    link.download = `hkmountain-${currentMountain?.id || 'cert'}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch (e) {
+    console.error('html2canvas error:', e);
+    alert('保存失敗，請嘗試截圖保存。');
+  }
+});
+
+$('#btn-share-cert').addEventListener('click', async () => {
+  const card = $('#cert-card');
+  try {
+    const canvas = await html2canvas(card, { scale: 2, backgroundColor: '#0f1110' });
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    if (navigator.share && blob) {
+      const file = new File([blob], 'hkmountain-cert.png', { type: 'image/png' });
+      await navigator.share({
+        title: `我登頂了${currentMountain?.nameCn || '山峰'}！`,
+        text: `我在香港山脈打卡網站登頂了${currentMountain?.nameCn || '山峰'} 🏔️`,
+        files: [file],
+      });
+    } else {
+      alert('此瀏覽器不支援分享功能，請使用「保存圖片」後手動分享。');
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      console.error('Share error:', e);
+    }
+  }
+});
+
+// ============================================
+// STATS
+// ============================================
+function updateStats() {
+  const total = checkins.length;
+  const totalElevation = checkins.reduce((sum, c) => {
+    const m = MOUNTAINS.find(mt => mt.id === c.mountain_id);
+    return sum + (m ? m.elevation : 0);
+  }, 0);
+  const highest = checkins.reduce((best, c) => {
+    const m = MOUNTAINS.find(mt => mt.id === c.mountain_id);
+    return (!best || (m && m.elevation > best.elevation)) ? m : best;
+  }, null);
+
+  $('#stat-peaks').textContent = `${total}/12`;
+  $('#stat-elevation').textContent = `${totalElevation.toLocaleString()}m`;
+  $('#stat-highest').textContent = highest ? highest.nameCn : '--';
+}
+
+// ============================================
+// ACHIEVEMENTS
+// ============================================
+function renderBadges() {
+  const grid = $('#badge-grid');
+  const checkedIds = checkins.map(c => c.mountain_id);
+  const totalElevation = checkins.reduce((sum, c) => {
+    const m = MOUNTAINS.find(mt => mt.id === c.mountain_id);
+    return sum + (m ? m.elevation : 0);
+  }, 0);
+
+  grid.innerHTML = ACHIEVEMENTS.map(a => {
+    const unlocked = a.cond(checkedIds, totalElevation);
+    return `<div class="badge-item ${unlocked ? 'unlocked' : 'locked'}">
+      <div class="badge-emoji">${a.icon}</div>
+      <div class="badge-title">${a.name}</div>
+    </div>`;
+  }).join('');
+}
+
+let lastAchievements = new Set();
+function checkAchievements() {
+  const checkedIds = checkins.map(c => c.mountain_id);
+  const totalElevation = checkins.reduce((sum, c) => {
+    const m = MOUNTAINS.find(mt => mt.id === c.mountain_id);
+    return sum + (m ? m.elevation : 0);
+  }, 0);
+
+  ACHIEVEMENTS.forEach(a => {
+    if (a.cond(checkedIds, totalElevation) && !lastAchievements.has(a.id)) {
+      lastAchievements.add(a.id);
+      showBadgeToast(a);
+
+      // Special: all 12 celebration
+      if (a.id === 'all-12' && typeof confetti !== 'undefined') {
+        for (let i = 0; i < 5; i++) {
+          setTimeout(() => {
+            confetti({ particleCount: 300, spread: 150, origin: { x: 0.5, y: 0.5 }, colors: ['#2d8a56', '#c4a43e', '#5b9bd5', '#e8ece9'] });
+          }, i * 400);
+        }
+      }
+    }
+  });
+
+  renderBadges();
+}
+
+function showBadgeToast(achievement) {
+  const container = $('#toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'badge-toast';
+  toast.innerHTML = `
+    <div class="badge-icon">${achievement.icon}</div>
+    <div class="badge-info">
+      <div class="badge-name">🏅 ${achievement.name}</div>
+      <div style="color:var(--ink-secondary);font-size:0.75rem;">徽章已解鎖！</div>
+    </div>
+  `;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+// ============================================
+// WEATHER
+// ============================================
+const WEATHER_EFFECTS = {
+  // WMO code range → effect
+  sunny: [0],
+  partlyCloudy: [1, 2, 3],
+  fog: [45, 48],
+  drizzle: [51, 52, 53, 54, 55],
+  rain: [61, 62, 63, 64, 65, 80, 81, 82],
+  thunderstorm: [95, 96, 99],
+};
+
+function getWeatherType(code) {
+  for (const [type, codes] of Object.entries(WEATHER_EFFECTS)) {
+    if (codes.includes(code)) return type;
+  }
+  return 'partlyCloudy';
+}
+
+async function fetchWeather() {
+  try {
+    const resp = await fetch('https://api.open-meteo.com/v1/forecast?latitude=22.3&longitude=114.2&current=weather_code,temperature_2m,wind_speed_10m');
+    const data = await resp.json();
+    const code = data.current?.weather_code ?? 1;
+    const temp = data.current?.temperature_2m;
+    const type = getWeatherType(code);
+    applyWeatherEffect(type, temp);
+  } catch {
+    // Fallback to partly cloudy
+    applyWeatherEffect('partlyCloudy', null);
+  }
+}
+
+function applyWeatherEffect(type, temp) {
+  const layer = $('#weather-layer');
+  let html = '';
+
+  // Temperature badge
+  if (temp != null) {
+    $('#weather-temp').textContent = `${Math.round(temp)}°C`;
+  }
+
+  switch (type) {
+    case 'sunny':
+      html += `<div class="weather-sun"></div>`;
+      html += generateClouds(2);
+      break;
+    case 'partlyCloudy':
+      html += `<div class="weather-sun" style="opacity:0.7; top:8%; right:12%;"></div>`;
+      html += generateClouds(5);
+      break;
+    case 'fog':
+      html += `<div class="weather-fog active"></div>`;
+      html += generateClouds(3);
+      break;
+    case 'drizzle':
+      html += `<div class="weather-rain active"></div>`;
+      html += `<div class="weather-dark-clouds active"></div>`;
+      html += generateClouds(4);
+      break;
+    case 'rain':
+      html += `<div class="weather-heavy-rain active"></div>`;
+      html += `<div class="weather-dark-clouds active"></div>`;
+      html += generateClouds(5);
+      break;
+    case 'thunderstorm':
+      html += `<div class="weather-heavy-rain active"></div>`;
+      html += `<div class="weather-dark-clouds active" style="background:linear-gradient(180deg, rgba(40,45,55,0.7) 0%, rgba(60,65,75,0.5) 50%, transparent 100%);"></div>`;
+      html += `<div class="weather-lightning" id="lightning"></div>`;
+      html += generateClouds(5);
+      // Lightning flashes
+      startLightning();
+      break;
+  }
+
+  layer.innerHTML = html;
+
+  // Update hiker weather state
+  updateHikerWeather(type);
+}
+
+function generateClouds(count) {
+  let html = '';
+  for (let i = 0; i < count; i++) {
+    const top = 5 + Math.random() * 25;
+    const size = 40 + Math.random() * 60;
+    const delay = Math.random() * 15;
+    const duration = 12 + Math.random() * 18;
+    html += `<div class="weather-cloud" style="
+      top:${top}%; width:${size}px; height:${size * 0.55}px;
+      animation-delay:-${delay}s; animation-duration:${duration}s;
+    "></div>`;
+  }
+  return html;
+}
+
+let lightningInterval = null;
+function startLightning() {
+  if (lightningInterval) clearInterval(lightningInterval);
+  lightningInterval = setInterval(() => {
+    const el = document.getElementById('lightning');
+    if (!el) return;
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 50 + Math.random() * 100);
+  }, 2000 + Math.random() * 4000);
+}
+
+// Stop lightning when weather changes
+function clearWeatherTimers() {
+  if (lightningInterval) { clearInterval(lightningInterval); lightningInterval = null; }
+}
+
+function updateHikerWeather(type) {
+  const hiker = document.getElementById('hiker-group');
+  if (!hiker) return;
+  hiker.classList.remove('raining', 'foggy', 'fast');
+  if (type === 'rain' || type === 'drizzle' || type === 'thunderstorm') {
+    hiker.classList.add('raining');
+  }
+  if (type === 'fog') {
+    hiker.classList.add('foggy');
+  }
+  if (type === 'thunderstorm') {
+    hiker.classList.add('fast');
+  }
+}
+
+// Weather refresh every 30 minutes
+setInterval(() => {
+  clearWeatherTimers();
+  fetchWeather();
+}, 30 * 60 * 1000);
+
+// ============================================
+// UTILITY
+// ============================================
+function formatDate(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ============================================
+// SVG COLOR CONSTANTS
+// ============================================
+const LAND_COLOR = '#c8e6c9';
+const LAND_STROKE = '#a5d6a7';
+const SAND_COLOR = '#ffe0b2';
+
+// ============================================
+// INIT
+// ============================================
+// Check for existing session
+supabase.auth.getSession().then(({ data }) => {
+  if (!data.session) {
+    showView('login');
+  }
+  // If session exists, onAuthStateChange will fire and set up the app
+});
+
+// Close modals on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    $('#mountain-modal').classList.remove('active');
+    $('#cert-overlay').classList.remove('active');
+  }
+});
+</script>
+</body>
+</html>
