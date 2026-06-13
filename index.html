@@ -47,7 +47,7 @@
   --shadow-modal: 0 1px 0 rgba(255,255,255,0.05), 0 16px 48px rgba(0,0,0,0.4);
 
   /* ===== LAYOUT ===== */
-  --map-height: 70vh;
+  --map-height: calc(100dvh - 56px);
 }
 
 /* ============================================
@@ -270,15 +270,12 @@ h2 { font-size: 1.25rem; font-weight: 600; }
    STATS PANEL
    ============================================ */
 .stats-panel {
-  display: flex; gap: 0; margin: -1.25rem 1rem 0;
+  display: flex; gap: 0; margin: 0;
   background: var(--bg-surface);
-  border-radius: var(--radius-card);
-  border: 1px solid rgba(255,255,255,0.06);
-  box-shadow: var(--shadow-card);
+  border-radius: 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
   overflow: hidden;
-  position: relative; z-index: 5;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .stat-item {
